@@ -39,8 +39,8 @@ function createWindow() {
     },
   });
 
-  // Click-through when not interacting
-  mainWindow.setIgnoreMouseEvents(true, { forward: true });
+  // Start with mouse events enabled (pet is interactive by default)
+  // The renderer will manage click-through via IPC when needed
 
   // Load content
   if (isDev) {
@@ -52,9 +52,10 @@ function createWindow() {
   // Don't show in taskbar
   mainWindow.setSkipTaskbar(true);
 
-  // Prevent window from stealing focus
-  mainWindow.on('focus', () => {
-    mainWindow.setIgnoreMouseEvents(true, { forward: true });
+  // Prevent window from being closed accidentally
+  mainWindow.on('close', (e) => {
+    e.preventDefault();
+    mainWindow.hide();
   });
 }
 
@@ -76,6 +77,30 @@ function startIdleDetection() {
     }
   }, 5000);
 }
+
+// ---------- Pet state store (simple JSON file) ----------
+const Store = (() => {
+  const fs = require('fs');
+  const storePath = path.join(app.getPath('userData'), 'pet-state.json');
+  return {
+    get() {
+      try {
+        if (fs.existsSync(storePath)) {
+          return JSON.parse(fs.readFileSync(storePath, 'utf8'));
+        }
+      } catch (e) { console.error('[store] read failed', e); }
+      return null;
+    },
+    set(data) {
+      try {
+        fs.writeFileSync(storePath, JSON.stringify(data), 'utf8');
+      } catch (e) { console.error('[store] write failed', e); }
+    }
+  };
+})();
+
+ipcMain.handle('pet:get-state', () => Store.get());
+ipcMain.handle('pet:save-state', (_e, state) => { Store.set(state); return true; });
 
 // IPC Handlers
 ipcMain.handle('get-system-idle', () => {

@@ -1,14 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Pet state persistence
-  getPetState: () => {
-    const stored = localStorage.getItem('petState');
-    return stored ? JSON.parse(stored) : null;
-  },
-  savePetState: (state) => {
-    localStorage.setItem('petState', JSON.stringify(state));
-  },
+  // Pet state persistence (via IPC to main process store)
+  getPetState: () => ipcRenderer.invoke('pet:get-state'),
+  savePetState: (state) => ipcRenderer.invoke('pet:save-state', state),
 
   // System idle
   getSystemIdle: () => ipcRenderer.invoke('get-system-idle'),

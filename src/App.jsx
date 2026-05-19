@@ -7,11 +7,12 @@ import ContextMenu from './components/ContextMenu';
 import Emotes, { useEmotes } from './components/Emotes';
 import LevelUp from './components/LevelUp';
 import { sprites } from './data/sprites';
-import { loadPet, savePet } from './services/petStorage';
+import { loadPet, loadPetAsync, savePet } from './services/petStorage';
 import { tick, feed, play, pet, sleep, calculateLevel } from './services/petEngine';
 
-// Map pet state to sprite key
-function getSpriteKey(petState) {
+// Map pet state to sprite key (deterministic, no Math.random)
+function getSpriteKey(petState, frameRef) {
+  const frame = frameRef % 2; // alternates 0/1
   switch (petState.state) {
     case 'sleeping':
       return 'slime_sleep';
@@ -19,12 +20,11 @@ function getSpriteKey(petState) {
       return 'slime_eat';
     case 'playing':
     case 'dancing':
-      return Math.random() > 0.5 ? 'slime_dance1' : 'slime_dance2';
+      return frame === 0 ? 'slime_dance1' : 'slime_dance2';
     case 'walking':
-      return Math.random() > 0.5 ? 'slime_walk1' : 'slime_walk2';
+      return frame === 0 ? 'slime_walk1' : 'slime_walk2';
     default:
-      // idle - alternate between idle frames
-      return Math.random() > 0.5 ? 'slime_idle' : 'slime_idle2';
+      return frame === 0 ? 'slime_idle' : 'slime_idle2';
   }
 }
 
@@ -48,6 +48,14 @@ function App() {
   const { emoteQueue, addEmote } = useEmotes();
   const idleSecondsRef = useRef(0);
   const actionTimeoutRef = useRef(null);
+  const frameRef = useRef(0);
+
+  // Load pet from electron-store on mount
+  useEffect(() => {
+    loadPetAsync().then((state) => {
+      if (state) setPetState(state);
+    });
+  }, []);
 
   // Save pet state whenever it changes
   useEffect(() => {
@@ -65,16 +73,12 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Update sprite based on state
+  // Update sprite based on state (deterministic frame counter)
   useEffect(() => {
     const interval = setInterval(() => {
-      if (petState.state === 'eating' || petState.state === 'playing') {
-        // Keep action sprite during action
-        setCurrentSprite(getSpriteKey(petState));
-      } else {
-        setCurrentSprite(getMoodSprite(petState.mood));
-      }
-    }, 800); // Animate every 800ms
+      frameRef.current += 1;
+      setCurrentSprite(getSpriteKey(petState, frameRef.current));
+    }, 800);
     return () => clearInterval(interval);
   }, [petState.state, petState.mood]);
 
