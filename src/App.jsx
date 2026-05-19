@@ -680,6 +680,14 @@ function App() {
         setShowHabitatSelector((prev) => !prev);
         break;
 
+      case 'breed':
+        setShowBreedingLab((prev) => !prev);
+        break;
+
+      case 'chat':
+        setShowChatLog((prev) => !prev);
+        break;
+
       case 'pets':
         setShowPetSlots((prev) => !prev);
         break;

@@ -1,37 +1,45 @@
-## PetDesk v0.5.0 - Crafting, Jobs & Arcade
+## PetDesk v0.6.0 - Leaderboard, Breeding, Dungeons & More
 
 ### New Features
 
-**Crafting System**
-- 8 material types earned from battles, garden, events, and daily rewards
-- 15 recipes: accessories, food, boosts, and a legendary Rainbow Gem
-- Recipe discovery mechanic (hidden until you find materials)
-- Sparkle animation on successful craft
+**Online Leaderboard (Simulated)**
+- 50 procedurally generated players with realistic gamertags
+- 5 categories: Level, Battle Wins, Arcade Score, Total XP, Collection
+- Daily score updates (fake players "play" too)
+- Motivational messages and rank tracking
+- Gold/silver/bronze medals for top 3
 
-**Rare Weather Events**
-- 6 events: Meteor Shower, Aurora Borealis, Thunderstorm, Rainbow, Snowstorm, Solar Eclipse
-- Each with unique visual effects and material/XP rewards
-- Solar Eclipse is ultra-rare (1%) with jackpot rewards
-- Conditions: some require night, day, or specific weather
+**Pet Breeding**
+- Combine 2 pets to create hybrid species
+- 6 hybrids: Slimecat, Ectoplasm, Phantom Cat, Mega Slime, Twin Tail, Poltergeist
+- 60 unique hybrid sprites with distinct visual identities
+- Requirements: both pets level 10+, 100 coins, 24h cooldown
+- Hybrids inherit averaged traits from both parents
 
-**Pet Jobs/Career**
-- 6 jobs: Pixel Artist, Code Monkey, Garden Keeper, Battle Trainer, Star Explorer, Royal Advisor
-- Real-time shifts (1-6 hours), earn passive XP + materials while away
-- Job progress persists even when app is closed
-- Desktop notification when shift completes
+**Pet AI Chat**
+- Pet talks to you with species-specific personality
+- Slime: cheerful and bouncy, Cat: sassy and aloof, Ghost: mysterious and eerie
+- Typewriter speech bubbles every 2-5 minutes
+- Reactions to events (feed, play, pet, level up, time of day)
+- Chat log with last 20 messages
+- Hybrids mix both parent response pools
 
-**Minigame Arcade**
-- Flappy Pet: flappy bird with your pet sprite, scaling difficulty
-- Snake: classic 15x15 grid, WASD/arrow controls, speed ramp
-- Block Stack: Tetris-lite with 4 pieces, line clearing, levels
-- High score tracking + XP rewards (score/10)
+**Procedural Dungeon Crawler**
+- 10-floor roguelike with 7x7 procedurally generated maps
+- Fog of war (only visited + adjacent rooms visible)
+- Tiered enemies: Pixel Bug → Data Rat → Virus → Malware → The Firewall
+- Turn-based combat: Attack, Heal, Flee
+- Loot table: common to legendary drops
+- Exclusive boss accessories: Dungeon Crown, Shadow Blade, Firewall Shield
+- Shop rooms to buy potions mid-run
 
-**Pet Housing/Decoration**
-- 24 furniture items across 6 categories (beds, tables, decor, floor, wallpaper)
-- 8x6 grid room with edit mode and arrow-key placement
-- Coins system: earn from battles, spend on furniture
-- Animated furniture: lava lamp, fish tank, neon sign, RGB desk
-- Room bonuses: energy, happiness, XP modifiers from placed items
+**Pet Photography**
+- Screenshot mode with live preview
+- 8 filters: Normal, Vintage, Neon, Noir, Dreamy, Pixel, Sunset, Ice
+- 6 frames: None, Polaroid, Gold, Pixel, Hearts, Space
+- 10 draggable stickers (resize, reposition)
+- Gallery saves up to 20 photos
+- Capture with flash effect animation
 
 ### Install
 ```bash
