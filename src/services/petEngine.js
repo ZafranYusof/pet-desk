@@ -6,6 +6,7 @@
 
 import { speciesConfig } from '../data/sprites';
 import { accessories } from '../data/accessories';
+import { checkEvolution, getEvolutionStage } from './evolutionService';
 
 export function createDefaultPet() {
   const now = Date.now();
@@ -176,6 +177,23 @@ export function checkUnlocks(petState) {
   });
 
   return { petState: updated, newUnlocks };
+}
+
+/**
+ * Check if a level-up triggers an evolution.
+ * Returns evolution data or null.
+ */
+export function checkEvolutionOnLevelUp(petState, oldLevel, newLevel) {
+  const species = petState.species || 'slime';
+  const evolution = checkEvolution(species, oldLevel, newLevel);
+  if (evolution) {
+    return {
+      ...evolution,
+      oldPrefix: getEvolutionStage(species, oldLevel).spritePrefix,
+      newPrefix: evolution.prefix,
+    };
+  }
+  return null;
 }
 
 /**

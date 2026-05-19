@@ -2,6 +2,7 @@
 import { motion } from 'framer-motion';
 import StatusBars from './StatusBars';
 import { speciesConfig } from '../data/sprites';
+import { getEvolutionStage, getNextEvolution, getEvolutionProgress } from '../services/evolutionService';
 
 const moodEmojis = {
   happy: '😊',
@@ -78,6 +79,41 @@ function StatsPanel({ petState, onClose, onRename, onOpenPetSelector, onOpenAcce
       <div className="text-xs text-gray-400 mb-2">
         Species: <span className="text-gray-200">{speciesName}</span>
       </div>
+
+      {/* Evolution Stage */}
+      {(() => {
+        const evoStage = getEvolutionStage(species, level);
+        const nextEvo = getNextEvolution(species, level);
+        const evoProgress = getEvolutionProgress(species, level);
+        return (
+          <div className="mb-3">
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-gray-400">Evolution:</span>
+              <span className="text-purple-300 font-medium">
+                {evoStage.name}
+                {evoProgress.percent >= 100 && (
+                  <span className="ml-1 bg-yellow-500/80 text-black px-1 py-0.5 rounded text-[10px] font-bold">MAX</span>
+                )}
+              </span>
+            </div>
+            {nextEvo && (
+              <>
+                <div className="flex justify-between text-[10px] text-gray-500 mb-0.5">
+                  <span>Lv.{level}</span>
+                  <span>Lv.{nextEvo.level} → {nextEvo.name}</span>
+                </div>
+                <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-purple-500 rounded-full"
+                    animate={{ width: `${evoProgress.percent}%` }}
+                    transition={{ duration: 0.5 }}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Mood */}
       <div className="flex items-center gap-2 mb-3 text-sm text-gray-300">

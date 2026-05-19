@@ -3,10 +3,13 @@ import { motion, useAnimationControls } from 'framer-motion';
 import PetSprite from './PetSprite';
 import Emotes, { useEmotes } from './Emotes';
 import sprites from '../data/sprites';
+import evolvedSprites from '../data/evolvedSprites';
 import { getPersonality } from '../services/personality';
+import { getEvolutionStage } from '../services/evolutionService';
 
-function getAnimationFrames(species = 'slime') {
-  const p = species;
+function getAnimationFrames(species = 'slime', level = 1) {
+  const evo = getEvolutionStage(species, level);
+  const p = evo.spritePrefix;
   return {
     idle: [`${p}_idle`, `${p}_idle2`],
     walking: [`${p}_walk1`, `${p}_walk2`],
@@ -33,10 +36,12 @@ const EDGE_PADDING = 50;
 const WALK_SPEED = 2; // px per frame at 60fps
 const GRAVITY_OFFSET = 150; // pet stays near bottom
 
-const Pet = ({ petState = 'idle', species = 'slime', onPet, onBounce, screenWidth = 1920, screenHeight = 1080, timeOfDay = 'afternoon', weather = 'sunny', triggerEmote = null }) => {
+const Pet = ({ petState = 'idle', species = 'slime', level = 1, onPet, onBounce, screenWidth = 1920, screenHeight = 1080, timeOfDay = 'afternoon', weather = 'sunny', triggerEmote = null, isCompanion = false, companionName = '', onPositionChange = null }) => {
   const [frameIndex, setFrameIndex] = useState(0);
   const [position, setPosition] = useState(() => ({
-    x: Math.floor((screenWidth - PET_SIZE) / 2),
+    x: isCompanion
+      ? Math.floor((screenWidth - PET_SIZE) * 0.75)
+      : Math.floor((screenWidth - PET_SIZE) / 2),
     y: screenHeight - GRAVITY_OFFSET,
   }));
   const [isWalking, setIsWalking] = useState(false);
@@ -56,7 +61,7 @@ const Pet = ({ petState = 'idle', species = 'slime', onPet, onBounce, screenWidt
 
   // Determine current state (walking overrides idle)
   const currentState = isWalking ? 'walking' : petState;
-  const ANIMATION_FRAMES = getAnimationFrames(species);
+  const ANIMATION_FRAMES = getAnimationFrames(species, level);
   const frames = ANIMATION_FRAMES[currentState] || ANIMATION_FRAMES.idle;
   const interval = FRAME_INTERVALS[currentState] || 800;
 
@@ -130,12 +135,16 @@ const Pet = ({ petState = 'idle', species = 'slime', onPet, onBounce, screenWidt
           // Arrived at destination
           targetRef.current = null;
           setIsWalking(false);
-          return { ...prev, x: target };
+          const newPos = { ...prev, x: target };
+          if (onPositionChange) onPositionChange(newPos);
+          return newPos;
         }
 
         const dir = dx > 0 ? 1 : -1;
         setWalkDirection(dir);
-        return { ...prev, x: prev.x + dir * effectiveWalkSpeed * delta };
+        const newPos = { ...prev, x: prev.x + dir * effectiveWalkSpeed * delta };
+        if (onPositionChange) onPositionChange(newPos);
+        return newPos;
       });
 
       if (targetRef.current !== null) {
@@ -274,7 +283,8 @@ const Pet = ({ petState = 'idle', species = 'slime', onPet, onBounce, screenWidt
     }
   }, []);
 
-  const currentSprite = sprites[frames[frameIndex % frames.length]];
+  const spriteKey = frames[frameIndex % frames.length];
+  const currentSprite = sprites[spriteKey] || evolvedSprites[spriteKey];
 
   // Jump animation (height modified by personality)
   const jumpY = isJumping ? -30 * (personality.bounceHeightMultiplier || 1) : 0;
@@ -328,12 +338,34 @@ const Pet = ({ petState = 'idle', species = 'slime', onPet, onBounce, screenWidt
         height: PET_SIZE,
         transition: isJumping ? 'top 0.2s ease-out' : 'none',
         opacity: ghostOpacity,
+        transform: isCompanion ? 'scale(0.8)' : undefined,
+        transformOrigin: 'bottom center',
       }}
       onClick={handleClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       <div style={{ position: 'relative', display: 'inline-block' }}>
+        {/* Companion name tag */}
+        {isCompanion && companionName && (
+          <div
+            style={{
+              position: 'absolute',
+              top: -20,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'rgba(0,0,0,0.6)',
+              color: '#93c5fd',
+              fontSize: '9px',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+            }}
+          >
+            {companionName}
+          </div>
+        )}
         <Emotes emoteQueue={emoteQueue} />
         <motion.div
           animate={currentState}

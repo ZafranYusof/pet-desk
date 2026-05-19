@@ -6,8 +6,11 @@ import ContextMenu from './components/ContextMenu';
 import LevelUp from './components/LevelUp';
 import PetSelector from './components/PetSelector';
 import AccessoryShop from './components/AccessoryShop';
-import { loadPet, loadPetAsync, savePet } from './services/petStorage';
-import { tick, feed, play, pet, sleep, calculateLevel, checkUnlocks, switchSpecies, equipAccessory, unequipAccessory } from './services/petEngine';
+import PetSlots from './components/PetSlots';
+import PetInteraction, { pickInteraction } from './components/PetInteraction';
+import { loadPet, loadPetAsync, savePet, loadAllPets, saveAllPets } from './services/petStorage';
+import { getPetSlots, savePetSlots, createNewPet, deletePet, summonCompanion, dismissCompanion, getCompanion, saveSlotState } from './services/multiPetService';
+import { tick, feed, play, pet, sleep, calculateLevel, checkUnlocks, checkEvolutionOnLevelUp, switchSpecies, equipAccessory, unequipAccessory } from './services/petEngine';
 import { getTimeOfDay, shouldAutoSleep } from './services/timeService';
 import { getWeather } from './services/weatherService';
 import { getPersonality, applyPersonalityToTick, shouldIgnoreClick } from './services/personality';
@@ -15,11 +18,15 @@ import { generateEntry, saveDiaryEntry, hasEntryToday } from './services/diarySe
 import { checkAndNotify, notifyLevelUp, recordInteraction } from './services/notificationService';
 import Particles from './components/Particles';
 import WeatherOverlay from './components/WeatherOverlay';
+import EvolutionAnimation from './components/EvolutionAnimation';
 import PetDiary from './components/PetDiary';
 import Achievements from './components/Achievements';
 import AchievementPopup from './components/AchievementPopup';
 import DailyReward from './components/DailyReward';
 import Scrapbook from './components/Scrapbook';
+import DesktopWidget from './components/DesktopWidget';
+import SpriteEditor from './components/SpriteEditor';
+import { getActiveCustomSpriteData, getActiveCustomSprite } from './services/customSpriteService';
 import { checkAchievements, getStats, incrementStat, recordGameWin } from './services/achievementService';
 import { checkDailyReward } from './services/dailyRewards';
 import { recordFirstFeed, recordFirstPlay, recordFirstPet, recordLevelUp, recordSpeciesUnlock, recordAccessoryEquip, recordAchievement, recordStreak, recordGameWin as recordGameWinScrapbook } from './services/scrapbookService';
@@ -67,12 +74,26 @@ function App() {
   const [showAchievements, setShowAchievements] = useState(false);
   const [showScrapbook, setShowScrapbook] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
+  const [showWidget, setShowWidget] = useState(false);
+  const [showSpriteEditor, setShowSpriteEditor] = useState(false);
+  const [activeCustomSpriteName, setActiveCustomSpriteName] = useState(() => getActiveCustomSprite());
   const [achievementPopup, setAchievementPopup] = useState(null);
+  const [evolutionAnimation, setEvolutionAnimation] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [levelUpLevel, setLevelUpLevel] = useState(null);
   const [timeOfDay, setTimeOfDay] = useState(() => getTimeOfDay());
   const [weather, setWeather] = useState(() => getWeather());
   const [screenSize, setScreenSize] = useState({ width: 1920, height: 1080 });
+
+  // Multi-pet state
+  const [petSlots, setPetSlots] = useState(() => getPetSlots());
+  const [companionSlot, setCompanionSlot] = useState(() => getCompanion());
+  const [companionState, setCompanionState] = useState(null);
+  const [showPetSlots, setShowPetSlots] = useState(false);
+  const [currentInteraction, setCurrentInteraction] = useState(null);
+  const [primaryPosition, setPrimaryPosition] = useState({ x: 200, y: 400 });
+  const [companionPosition, setCompanionPosition] = useState({ x: 600, y: 400 });
+  const interactionTimerRef = useRef(null);
 
   // Get screen size on mount
   useEffect(() => {
@@ -84,6 +105,93 @@ function App() {
       setScreenSize({ width: window.innerWidth, height: window.innerHeight });
     }
   }, []);
+
+  // Load companion on mount
+  useEffect(() => {
+    const slots = getPetSlots();
+    setPetSlots(slots);
+    const compSlot = getCompanion();
+    if (compSlot !== null && slots[compSlot]) {
+      setCompanionSlot(compSlot);
+      setCompanionState(slots[compSlot]);
+    }
+  }, []);
+
+  // Companion tick (same as primary but independent)
+  useEffect(() => {
+    if (!companionState) return;
+    const interval = setInterval(() => {
+      setCompanionState((prev) => {
+        if (!prev) return prev;
+        const updated = tick(prev, 0);
+        if (companionSlot !== null) {
+          saveSlotState(companionSlot, updated);
+        }
+        return updated;
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [companionState !== null, companionSlot]);
+
+  // Pet-to-pet interaction timer (30-60s random interval)
+  useEffect(() => {
+    if (!companionState) {
+      if (interactionTimerRef.current) {
+        clearTimeout(interactionTimerRef.current);
+        interactionTimerRef.current = null;
+      }
+      return;
+    }
+
+    function scheduleInteraction() {
+      const delay = 30000 + Math.random() * 30000; // 30-60 seconds
+      interactionTimerRef.current = setTimeout(() => {
+        const interaction = pickInteraction(
+          petState.species || 'slime',
+          companionState?.species || 'slime'
+        );
+        setCurrentInteraction(interaction);
+
+        // Apply bonuses after interaction completes
+        setTimeout(() => {
+          setPetState((prev) => {
+            const updated = { ...prev };
+            updated.happiness = Math.min(100, updated.happiness + 2);
+            updated.xp += 5;
+            updated.level = calculateLevel(updated.xp);
+            return updated;
+          });
+          setCompanionState((prev) => {
+            if (!prev) return prev;
+            const updated = { ...prev };
+            updated.happiness = Math.min(100, updated.happiness + 2);
+            updated.xp += 5;
+            updated.level = calculateLevel(updated.xp);
+            if (companionSlot !== null) {
+              saveSlotState(companionSlot, updated);
+            }
+            return updated;
+          });
+        }, (interaction.duration || 4000) + 500);
+
+        scheduleInteraction();
+      }, delay);
+    }
+
+    scheduleInteraction();
+    return () => {
+      if (interactionTimerRef.current) {
+        clearTimeout(interactionTimerRef.current);
+      }
+    };
+  }, [companionState !== null, petState.species]);
+
+  // Sync pet slots when primary state changes
+  useEffect(() => {
+    const slots = getPetSlots();
+    slots[0] = petState;
+    setPetSlots(slots);
+  }, [petState]);
   const [justPetted, setJustPetted] = useState(false);
   const [triggerEmote, setTriggerEmote] = useState(null);
   const idleSecondsRef = useRef(0);
@@ -277,6 +385,14 @@ function App() {
         setShowStats((prev) => !prev);
         break;
 
+      case 'widget':
+        setShowWidget((prev) => !prev);
+        break;
+
+      case 'spriteEditor':
+        setShowSpriteEditor((prev) => !prev);
+        break;
+
       case 'rename':
         setShowStats(true);
         break;
@@ -291,6 +407,25 @@ function App() {
 
       case 'scrapbook':
         setShowScrapbook((prev) => !prev);
+        break;
+
+      case 'pets':
+        setShowPetSlots((prev) => !prev);
+        break;
+
+      case 'summonCompanion': {
+        const slots = getPetSlots();
+        for (let i = 1; i < slots.length; i++) {
+          if (slots[i]) {
+            handleSummonCompanion(i);
+            break;
+          }
+        }
+        break;
+      }
+
+      case 'dismissCompanion':
+        handleDismissCompanion();
         break;
 
       default:
@@ -315,6 +450,15 @@ function App() {
     if (updated.level > prev.level) {
       setLevelUpLevel(updated.level);
       notifyLevelUp(updated.level);
+      // Check for evolution
+      const evoData = checkEvolutionOnLevelUp(updated, prev.level, updated.level);
+      if (evoData) {
+        setEvolutionAnimation({
+          oldSpriteKey: `${evoData.oldPrefix}_idle`,
+          newSpriteKey: `${evoData.newPrefix}_idle`,
+          name: evoData.name,
+        });
+      }
       // Check for new unlocks
       const { petState: withUnlocks, newUnlocks } = checkUnlocks(updated);
       setPetState(withUnlocks);
@@ -393,6 +537,39 @@ function App() {
     setContextMenu({ x: e.clientX, y: e.clientY });
   }, []);
 
+  // Multi-pet handlers
+  const handleSummonCompanion = useCallback((slotIndex) => {
+    const slots = getPetSlots();
+    if (!slots[slotIndex]) return;
+    summonCompanion(slotIndex);
+    setCompanionSlot(slotIndex);
+    setCompanionState(slots[slotIndex]);
+  }, []);
+
+  const handleDismissCompanion = useCallback(() => {
+    dismissCompanion();
+    setCompanionSlot(null);
+    setCompanionState(null);
+    setCurrentInteraction(null);
+  }, []);
+
+  const handleCreatePet = useCallback((species, name) => {
+    const updatedSlots = createNewPet(species, name, petState.level || 1);
+    if (updatedSlots) {
+      setPetSlots(updatedSlots);
+    }
+  }, [petState.level]);
+
+  const handleDeletePet = useCallback((slotIndex) => {
+    const updatedSlots = deletePet(slotIndex);
+    if (updatedSlots) {
+      setPetSlots(updatedSlots);
+      if (companionSlot === slotIndex) {
+        handleDismissCompanion();
+      }
+    }
+  }, [companionSlot]);
+
 
   const handleRename = useCallback((newName) => {
     setPetState((prev) => ({ ...prev, name: newName }));
@@ -427,6 +604,7 @@ function App() {
       <Pet
         petState={petState.state || 'idle'}
         species={petState.species || 'slime'}
+        level={petState.level || 1}
         onPet={handlePetClick}
         onBounce={() => {}}
         screenWidth={screenSize.width}
@@ -434,6 +612,34 @@ function App() {
         timeOfDay={timeOfDay}
         weather={weather}
         triggerEmote={triggerEmote}
+        onPositionChange={setPrimaryPosition}
+      />
+
+      {/* Companion pet */}
+      {companionState && (
+        <Pet
+          petState={companionState.state || 'idle'}
+          species={companionState.species || 'slime'}
+          level={companionState.level || 1}
+          onPet={() => {}}
+          onBounce={() => {}}
+          screenWidth={screenSize.width}
+          screenHeight={screenSize.height}
+          timeOfDay={timeOfDay}
+          weather={weather}
+          triggerEmote={null}
+          isCompanion={true}
+          companionName={companionState.name}
+          onPositionChange={setCompanionPosition}
+        />
+      )}
+
+      {/* Pet-to-pet interaction effects */}
+      <PetInteraction
+        interaction={currentInteraction}
+        primaryPosition={primaryPosition}
+        companionPosition={companionPosition}
+        onComplete={() => setCurrentInteraction(null)}
       />
 
       {/* Particle effects */}
@@ -444,6 +650,27 @@ function App() {
       <Particles type="fire" active={petState.hunger !== undefined && petState.hunger < 20} />
       <Particles type="zzz" active={petState.state === 'sleeping'} />
       <Particles type="music" active={petState.state === 'dancing'} />
+
+      {/* Desktop Widget */}
+      <DesktopWidget
+        petPosition={{ x: 200, y: 200 }}
+        petState={petState}
+        visible={showWidget}
+        onTimerEnd={() => {
+          setPetState((prev) => ({ ...prev, state: 'dancing' }));
+          setTimeout(() => setPetState((prev) => ({ ...prev, state: 'idle' })), 3000);
+        }}
+      />
+
+      {/* Sprite Editor */}
+      <AnimatePresence>
+        {showSpriteEditor && (
+          <SpriteEditor
+            onClose={() => setShowSpriteEditor(false)}
+            onApplyCustomSprite={(name) => setActiveCustomSpriteName(name)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Context menu */}
       <AnimatePresence>
@@ -527,6 +754,22 @@ function App() {
         )}
       </AnimatePresence>
 
+      {/* Pet Slots panel */}
+      <AnimatePresence>
+        {showPetSlots && (
+          <PetSlots
+            slots={petSlots}
+            primaryLevel={petState.level || 1}
+            companionSlot={companionSlot}
+            onSummon={handleSummonCompanion}
+            onDismiss={handleDismissCompanion}
+            onCreate={handleCreatePet}
+            onDelete={handleDeletePet}
+            onClose={() => setShowPetSlots(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Daily Reward popup */}
       <AnimatePresence>
         {showDailyReward && (
@@ -558,6 +801,18 @@ function App() {
           <LevelUp
             level={levelUpLevel}
             onComplete={() => setLevelUpLevel(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Evolution animation */}
+      <AnimatePresence>
+        {evolutionAnimation && (
+          <EvolutionAnimation
+            oldSpriteKey={evolutionAnimation.oldSpriteKey}
+            newSpriteKey={evolutionAnimation.newSpriteKey}
+            evolutionName={evolutionAnimation.name}
+            onComplete={() => setEvolutionAnimation(null)}
           />
         )}
       </AnimatePresence>
