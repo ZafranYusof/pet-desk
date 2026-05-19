@@ -1,4 +1,4 @@
-# PetDesk 🐾
+# PetDesk
 
 [![Version](https://img.shields.io/badge/version-0.3.0-4ade80?style=flat-square)](https://github.com/ZafranYusof/pet-desk/releases)
 [![License](https://img.shields.io/badge/license-MIT-10b981?style=flat-square)](LICENSE)
