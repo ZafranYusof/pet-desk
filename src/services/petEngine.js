@@ -1,7 +1,11 @@
-/**
+﻿/**
  * PetDesk - Pet State Engine
  * Manages pet mood, hunger, energy, happiness, XP, and animation states.
+ * Includes species/accessory unlock logic.
  */
+
+import { speciesConfig } from '../data/sprites';
+import { accessories } from '../data/accessories';
 
 export function createDefaultPet() {
   const now = Date.now();
@@ -19,6 +23,10 @@ export function createDefaultPet() {
     totalPets: 0,
     createdAt: now,
     state: 'idle',
+    species: 'slime',
+    accessories: [],
+    unlockedSpecies: ['slime'],
+    unlockedAccessories: ['party-hat'],
   };
 }
 
@@ -141,4 +149,73 @@ export function getState(petState, idleSeconds) {
   if (petState.mood === 'happy') return 'walking';
 
   return 'idle';
+}
+
+/**
+ * Check and apply unlocks when level changes.
+ * Returns updated pet state with newly unlocked species/accessories.
+ */
+export function checkUnlocks(petState) {
+  const updated = { ...petState };
+  let newUnlocks = [];
+
+  // Check species unlocks
+  Object.entries(speciesConfig).forEach(([id, config]) => {
+    if (updated.level >= config.unlockLevel && !updated.unlockedSpecies.includes(id)) {
+      updated.unlockedSpecies = [...updated.unlockedSpecies, id];
+      newUnlocks.push({ type: 'species', id, name: config.name });
+    }
+  });
+
+  // Check accessory unlocks
+  accessories.forEach((acc) => {
+    if (updated.level >= acc.unlockLevel && !updated.unlockedAccessories.includes(acc.id)) {
+      updated.unlockedAccessories = [...updated.unlockedAccessories, acc.id];
+      newUnlocks.push({ type: 'accessory', id: acc.id, name: acc.name });
+    }
+  });
+
+  return { petState: updated, newUnlocks };
+}
+
+/**
+ * Switch active species
+ */
+export function switchSpecies(petState, speciesId) {
+  if (!petState.unlockedSpecies.includes(speciesId)) return petState;
+  const config = speciesConfig[speciesId];
+  return {
+    ...petState,
+    species: speciesId,
+    name: config?.name || petState.name,
+  };
+}
+
+/**
+ * Equip an accessory (max 1 per category)
+ */
+export function equipAccessory(petState, accessoryId) {
+  const acc = accessories.find((a) => a.id === accessoryId);
+  if (!acc || !petState.unlockedAccessories.includes(accessoryId)) return petState;
+
+  // Remove any existing accessory in same category
+  const filtered = petState.accessories.filter((id) => {
+    const existing = accessories.find((a) => a.id === id);
+    return existing?.category !== acc.category;
+  });
+
+  return {
+    ...petState,
+    accessories: [...filtered, accessoryId],
+  };
+}
+
+/**
+ * Unequip an accessory
+ */
+export function unequipAccessory(petState, accessoryId) {
+  return {
+    ...petState,
+    accessories: petState.accessories.filter((id) => id !== accessoryId),
+  };
 }

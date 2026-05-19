@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import StatusBars from './StatusBars';
+import { speciesConfig } from '../data/sprites';
 
 const moodEmojis = {
   happy: '😊',
@@ -9,9 +10,11 @@ const moodEmojis = {
   tired: '😴',
   sad: '😢',
   excited: '🤩',
+  neutral: '🙂',
+  sleepy: '😴',
 };
 
-function StatsPanel({ petState, onClose, onRename }) {
+function StatsPanel({ petState, onClose, onRename, onOpenPetSelector, onOpenAccessoryShop }) {
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState(petState?.name || 'Pet');
 
@@ -20,6 +23,8 @@ function StatsPanel({ petState, onClose, onRename }) {
   const xp = petState?.xp || 0;
   const xpToNext = petState?.xpToNext || 100;
   const stats = petState?.stats || {};
+  const species = petState?.species || 'slime';
+  const speciesName = speciesConfig[species]?.name || 'Slime';
 
   function handleNameSubmit() {
     if (nameInput.trim()) {
@@ -69,6 +74,11 @@ function StatsPanel({ petState, onClose, onRename }) {
         </button>
       </div>
 
+      {/* Species */}
+      <div className="text-xs text-gray-400 mb-2">
+        Species: <span className="text-gray-200">{speciesName}</span>
+      </div>
+
       {/* Mood */}
       <div className="flex items-center gap-2 mb-3 text-sm text-gray-300">
         <span className="text-lg">{moodEmojis[mood] || '🙂'}</span>
@@ -97,6 +107,22 @@ function StatsPanel({ petState, onClose, onRename }) {
             transition={{ duration: 0.5 }}
           />
         </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-2 mb-3">
+        <button
+          className="flex-1 text-xs bg-indigo-600/60 hover:bg-indigo-600/80 text-white py-1.5 px-2 rounded-lg transition-colors"
+          onClick={onOpenPetSelector}
+        >
+          Change Pet
+        </button>
+        <button
+          className="flex-1 text-xs bg-pink-600/60 hover:bg-pink-600/80 text-white py-1.5 px-2 rounded-lg transition-colors"
+          onClick={onOpenAccessoryShop}
+        >
+          Accessories
+        </button>
       </div>
 
       {/* Stats */}

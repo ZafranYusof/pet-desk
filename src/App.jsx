@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import PetSprite from './components/PetSprite';
 import StatusBars from './components/StatusBars';
@@ -6,42 +6,50 @@ import StatsPanel from './components/StatsPanel';
 import ContextMenu from './components/ContextMenu';
 import Emotes, { useEmotes } from './components/Emotes';
 import LevelUp from './components/LevelUp';
-import { sprites } from './data/sprites';
+import Accessory from './components/Accessory';
+import PetSelector from './components/PetSelector';
+import AccessoryShop from './components/AccessoryShop';
+import { sprites, speciesConfig, speciesAccessoryOffsets } from './data/sprites';
+import { accessories } from './data/accessories';
 import { loadPet, loadPetAsync, savePet } from './services/petStorage';
-import { tick, feed, play, pet, sleep, calculateLevel } from './services/petEngine';
+import { tick, feed, play, pet, sleep, calculateLevel, checkUnlocks, switchSpecies, equipAccessory, unequipAccessory } from './services/petEngine';
 
-// Map pet state to sprite key (deterministic, no Math.random)
+// Map pet state to sprite key based on species
 function getSpriteKey(petState, frameRef) {
-  const frame = frameRef % 2; // alternates 0/1
+  const frame = frameRef % 2;
+  const prefix = petState.species || 'slime';
   switch (petState.state) {
     case 'sleeping':
-      return 'slime_sleep';
+      return `${prefix}_sleep`;
     case 'eating':
-      return 'slime_eat';
+      return `${prefix}_eat`;
     case 'playing':
     case 'dancing':
-      return frame === 0 ? 'slime_dance1' : 'slime_dance2';
+      return frame === 0 ? `${prefix}_dance1` : `${prefix}_dance2`;
     case 'walking':
-      return frame === 0 ? 'slime_walk1' : 'slime_walk2';
+      return frame === 0 ? `${prefix}_walk1` : `${prefix}_walk2`;
     default:
-      return frame === 0 ? 'slime_idle' : 'slime_idle2';
+      return frame === 0 ? `${prefix}_idle` : `${prefix}_idle2`;
   }
 }
 
 // Map mood to sprite for static display
-function getMoodSprite(mood) {
+function getMoodSprite(mood, species) {
+  const prefix = species || 'slime';
   switch (mood) {
-    case 'happy': return 'slime_happy';
-    case 'sad': return 'slime_sad';
-    case 'sleepy': return 'slime_sleep';
-    case 'hungry': return 'slime_sad';
-    default: return 'slime_idle';
+    case 'happy': return `${prefix}_happy`;
+    case 'sad': return `${prefix}_sad`;
+    case 'sleepy': return `${prefix}_sleep`;
+    case 'hungry': return `${prefix}_sad`;
+    default: return `${prefix}_idle`;
   }
 }
 
 function App() {
   const [petState, setPetState] = useState(() => loadPet());
   const [showStats, setShowStats] = useState(false);
+  const [showPetSelector, setShowPetSelector] = useState(false);
+  const [showAccessoryShop, setShowAccessoryShop] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
   const [currentSprite, setCurrentSprite] = useState('slime_idle');
   const [levelUpLevel, setLevelUpLevel] = useState(null);
@@ -50,10 +58,29 @@ function App() {
   const actionTimeoutRef = useRef(null);
   const frameRef = useRef(0);
 
+  // Ensure pet state has new fields (migration for existing saves)
+  useEffect(() => {
+    setPetState((prev) => ({
+      species: 'slime',
+      accessories: [],
+      unlockedSpecies: ['slime'],
+      unlockedAccessories: ['party-hat'],
+      ...prev,
+    }));
+  }, []);
+
   // Load pet from electron-store on mount
   useEffect(() => {
     loadPetAsync().then((state) => {
-      if (state) setPetState(state);
+      if (state) {
+        setPetState((prev) => ({
+          species: 'slime',
+          accessories: [],
+          unlockedSpecies: ['slime'],
+          unlockedAccessories: ['party-hat'],
+          ...state,
+        }));
+      }
     });
   }, []);
 
@@ -80,13 +107,12 @@ function App() {
       setCurrentSprite(getSpriteKey(petState, frameRef.current));
     }, 800);
     return () => clearInterval(interval);
-  }, [petState.state, petState.mood]);
+  }, [petState.state, petState.mood, petState.species]);
 
   // Listen for electron IPC events
   useEffect(() => {
     if (!window.electronAPI) return;
 
-    // Idle state changes
     window.electronAPI.onIdleChange?.((data) => {
       idleSecondsRef.current = data.idleSeconds;
     });
@@ -95,7 +121,6 @@ function App() {
       idleSecondsRef.current = data.idleSeconds;
     });
 
-    // Tray actions
     window.electronAPI.onPetAction?.((action) => {
       handleAction(action);
     });
@@ -142,7 +167,6 @@ function App() {
         break;
 
       case 'rename':
-        // Handled by StatsPanel
         setShowStats(true);
         break;
 
@@ -161,6 +185,9 @@ function App() {
   function checkLevelUp(prev, updated) {
     if (updated.level > prev.level) {
       setLevelUpLevel(updated.level);
+      // Check for new unlocks
+      const { petState: withUnlocks } = checkUnlocks(updated);
+      setPetState(withUnlocks);
     }
   }
 
@@ -197,7 +224,26 @@ function App() {
     setPetState((prev) => ({ ...prev, name: newName }));
   }, []);
 
+  const handleSelectSpecies = useCallback((speciesId) => {
+    setPetState((prev) => switchSpecies(prev, speciesId));
+    setShowPetSelector(false);
+  }, []);
+
+  const handleEquipAccessory = useCallback((accId) => {
+    setPetState((prev) => equipAccessory(prev, accId));
+  }, []);
+
+  const handleUnequipAccessory = useCallback((accId) => {
+    setPetState((prev) => unequipAccessory(prev, accId));
+  }, []);
+
   const spriteData = sprites[currentSprite] || sprites.slime_idle;
+  const currentSpeciesOffsets = speciesAccessoryOffsets[petState.species || 'slime'] || speciesAccessoryOffsets.slime;
+
+  // Get equipped accessory objects
+  const equippedAccessoryObjects = (petState.accessories || [])
+    .map((id) => accessories.find((a) => a.id === id))
+    .filter(Boolean);
 
   return (
     <div
@@ -215,8 +261,18 @@ function App() {
         {/* Emotes floating above */}
         <Emotes emoteQueue={emoteQueue} />
 
-        {/* The pet */}
-        <PetSprite sprite={spriteData} scale={1.5} />
+        {/* The pet with accessories */}
+        <div className="relative">
+          <PetSprite sprite={spriteData} scale={1.5} />
+          {equippedAccessoryObjects.map((acc) => (
+            <Accessory
+              key={acc.id}
+              accessory={acc}
+              speciesOffsets={currentSpeciesOffsets}
+              cellSize={4}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Context menu */}
@@ -242,11 +298,40 @@ function App() {
               stats: {
                 totalPets: petState.totalPets,
                 daysAlive: Math.floor((Date.now() - petState.createdAt) / 86400000),
-                timesFed: Math.floor(petState.xp / 5), // approximate
+                timesFed: Math.floor(petState.xp / 5),
               },
             }}
             onClose={() => setShowStats(false)}
             onRename={handleRename}
+            onOpenPetSelector={() => { setShowPetSelector(true); setShowAccessoryShop(false); }}
+            onOpenAccessoryShop={() => { setShowAccessoryShop(true); setShowPetSelector(false); }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Pet Selector */}
+      <AnimatePresence>
+        {showPetSelector && (
+          <PetSelector
+            currentSpecies={petState.species || 'slime'}
+            unlockedSpecies={petState.unlockedSpecies || ['slime']}
+            currentLevel={petState.level || 1}
+            onSelect={handleSelectSpecies}
+            onClose={() => setShowPetSelector(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Accessory Shop */}
+      <AnimatePresence>
+        {showAccessoryShop && (
+          <AccessoryShop
+            equippedAccessories={petState.accessories || []}
+            unlockedAccessories={petState.unlockedAccessories || ['party-hat']}
+            currentLevel={petState.level || 1}
+            onEquip={handleEquipAccessory}
+            onUnequip={handleUnequipAccessory}
+            onClose={() => setShowAccessoryShop(false)}
           />
         )}
       </AnimatePresence>

@@ -21,10 +21,10 @@ function createWindow() {
   const { width, height } = primaryDisplay.workAreaSize;
 
   mainWindow = new BrowserWindow({
-    width: 200,
-    height: 200,
-    x: width - 220,
-    y: height - 220,
+    width: width,
+    height: height,
+    x: 0,
+    y: 0,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
@@ -39,8 +39,8 @@ function createWindow() {
     },
   });
 
-  // Start with mouse events enabled (pet is interactive by default)
-  // The renderer will manage click-through via IPC when needed
+  // Full screen click-through: ignore mouse events everywhere except pet sprite
+  mainWindow.setIgnoreMouseEvents(true, { forward: true });
 
   // Load content
   if (isDev) {
@@ -103,6 +103,12 @@ ipcMain.handle('pet:get-state', () => Store.get());
 ipcMain.handle('pet:save-state', (_e, state) => { Store.set(state); return true; });
 
 // IPC Handlers
+ipcMain.handle('get-screen-size', () => {
+  const { screen } = require('electron');
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  return { width, height };
+});
+
 ipcMain.handle('get-system-idle', () => {
   return powerMonitor.getSystemIdleTime();
 });

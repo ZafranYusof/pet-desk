@@ -5,6 +5,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPetState: () => ipcRenderer.invoke('pet:get-state'),
   savePetState: (state) => ipcRenderer.invoke('pet:save-state', state),
 
+  // Screen size
+  getScreenSize: () => ipcRenderer.invoke('get-screen-size'),
+
   // System idle
   getSystemIdle: () => ipcRenderer.invoke('get-system-idle'),
   onIdleChange: (callback) => {

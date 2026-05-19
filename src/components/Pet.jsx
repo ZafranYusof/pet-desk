@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useAnimationControls } from 'framer-motion';
 import PetSprite from './PetSprite';
 import Emotes, { useEmotes } from './Emotes';
 import sprites from '../data/sprites';
@@ -24,13 +24,26 @@ const FRAME_INTERVALS = {
   sad: 1000,
 };
 
-const Pet = ({ petState = 'idle', onPet }) => {
+const PET_SIZE = 128;
+const EDGE_PADDING = 50;
+const WALK_SPEED = 2; // px per frame at 60fps
+const GRAVITY_OFFSET = 150; // pet stays near bottom
+
+const Pet = ({ petState = 'idle', onPet, onBounce, screenWidth = 1920, screenHeight = 1080 }) => {
   const [frameIndex, setFrameIndex] = useState(0);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [position, setPosition] = useState(() => ({
+    x: Math.floor((screenWidth - PET_SIZE) / 2),
+    y: screenHeight - GRAVITY_OFFSET,
+  }));
   const [isWalking, setIsWalking] = useState(false);
-  const [walkDirection, setWalkDirection] = useState(1);
+  const [isJumping, setIsJumping] = useState(false);
+  const [walkDirection, setWalkDirection] = useState(1); // 1 = right, -1 = left
+  const [isHovered, setIsHovered] = useState(false);
+
   const walkTimerRef = useRef(null);
-  const walkIntervalRef = useRef(null);
+  const animFrameRef = useRef(null);
+  const targetRef = useRef(null);
+  const idleTimerRef = useRef(null);
   const { emoteQueue, addEmote } = useEmotes();
 
   // Determine current state (walking overrides idle)
@@ -38,7 +51,7 @@ const Pet = ({ petState = 'idle', onPet }) => {
   const frames = ANIMATION_FRAMES[currentState] || ANIMATION_FRAMES.idle;
   const interval = FRAME_INTERVALS[currentState] || 800;
 
-  // Animation frame loop
+  // Animation frame loop (sprite frames)
   useEffect(() => {
     const timer = setInterval(() => {
       setFrameIndex((prev) => (prev + 1) % frames.length);
@@ -46,46 +59,101 @@ const Pet = ({ petState = 'idle', onPet }) => {
     return () => clearInterval(timer);
   }, [frames.length, interval]);
 
-  // Walking behavior: every 10-20s, walk for 2-4s
+  // Pick a new random destination along the bottom edge
+  const pickNewDestination = useCallback(() => {
+    const minX = EDGE_PADDING;
+    const maxX = screenWidth - PET_SIZE - EDGE_PADDING;
+    const targetX = Math.floor(Math.random() * (maxX - minX)) + minX;
+    return targetX;
+  }, [screenWidth]);
+
+  // Walking logic using requestAnimationFrame
   useEffect(() => {
-    const scheduleWalk = () => {
-      const delay = (Math.random() * 10 + 10) * 1000; // 10-20s
-      walkTimerRef.current = setTimeout(() => {
-        if (petState === 'idle') {
-          const direction = Math.random() > 0.5 ? 1 : -1;
-          setWalkDirection(direction);
-          setIsWalking(true);
+    if (!isWalking || targetRef.current === null) return;
 
-          // Move position during walk
-          const walkSpeed = 2;
-          walkIntervalRef.current = setInterval(() => {
-            setPosition((prev) => ({
-              ...prev,
-              x: Math.max(-200, Math.min(200, prev.x + direction * walkSpeed)),
-            }));
-          }, 50);
+    let lastTime = performance.now();
 
-          // Stop walking after 2-4s
-          const walkDuration = (Math.random() * 2 + 2) * 1000;
-          setTimeout(() => {
-            setIsWalking(false);
-            if (walkIntervalRef.current) {
-              clearInterval(walkIntervalRef.current);
-            }
-            scheduleWalk();
-          }, walkDuration);
-        } else {
-          scheduleWalk();
+    const step = (now) => {
+      const delta = (now - lastTime) / (1000 / 60); // normalize to 60fps
+      lastTime = now;
+
+      setPosition((prev) => {
+        const target = targetRef.current;
+        if (target === null) return prev;
+
+        const dx = target - prev.x;
+        const dist = Math.abs(dx);
+
+        if (dist < WALK_SPEED * 2) {
+          // Arrived at destination
+          targetRef.current = null;
+          setIsWalking(false);
+          return { ...prev, x: target };
         }
-      }, delay);
+
+        const dir = dx > 0 ? 1 : -1;
+        setWalkDirection(dir);
+        return { ...prev, x: prev.x + dir * WALK_SPEED * delta };
+      });
+
+      if (targetRef.current !== null) {
+        animFrameRef.current = requestAnimationFrame(step);
+      }
     };
 
-    scheduleWalk();
+    animFrameRef.current = requestAnimationFrame(step);
     return () => {
-      if (walkTimerRef.current) clearTimeout(walkTimerRef.current);
-      if (walkIntervalRef.current) clearInterval(walkIntervalRef.current);
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
+  }, [isWalking]);
+
+  // Schedule walking behavior: idle 5-15s, then walk to new destination
+  useEffect(() => {
+    const scheduleNextWalk = () => {
+      const idleTime = (Math.random() * 10 + 5) * 1000; // 5-15s
+      idleTimerRef.current = setTimeout(() => {
+        if (petState === 'idle' || petState === 'happy') {
+          const dest = pickNewDestination();
+          targetRef.current = dest;
+          setIsWalking(true);
+        }
+        scheduleNextWalk();
+      }, idleTime);
+    };
+
+    scheduleNextWalk();
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, [petState, pickNewDestination]);
+
+  // Stop walking when state changes to sleeping/eating/dancing
+  useEffect(() => {
+    if (petState === 'sleeping' || petState === 'eating' || petState === 'dancing') {
+      setIsWalking(false);
+      targetRef.current = null;
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    }
   }, [petState]);
+
+  // Occasional jump (every 20-40s when idle)
+  useEffect(() => {
+    const scheduleJump = () => {
+      const delay = (Math.random() * 20 + 20) * 1000;
+      const timer = setTimeout(() => {
+        if ((petState === 'idle' || petState === 'happy') && !isWalking) {
+          setIsJumping(true);
+          if (onBounce) onBounce();
+          setTimeout(() => setIsJumping(false), 400);
+        }
+        scheduleJump();
+      }, delay);
+      return timer;
+    };
+
+    const timer = scheduleJump();
+    return () => clearTimeout(timer);
+  }, [petState, isWalking, onBounce]);
 
   // Emotes based on state
   useEffect(() => {
@@ -104,14 +172,33 @@ const Pet = ({ petState = 'idle', onPet }) => {
   }, [petState, addEmote]);
 
   // Click to pet
-  const handleClick = useCallback(() => {
+  const handleClick = useCallback((e) => {
+    e.stopPropagation();
     addEmote('heart');
     if (onPet) onPet();
   }, [addEmote, onPet]);
 
+  // Mouse enter/leave for click-through toggle
+  const handleMouseEnter = useCallback(() => {
+    setIsHovered(true);
+    if (window.electronAPI) {
+      window.electronAPI.setIgnoreMouse(false);
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsHovered(false);
+    if (window.electronAPI) {
+      window.electronAPI.setIgnoreMouse(true);
+    }
+  }, []);
+
   const currentSprite = sprites[frames[frameIndex % frames.length]];
 
-  // Bounce animation for idle/happy
+  // Jump animation
+  const jumpY = isJumping ? -30 : 0;
+
+  // Bounce animation variants
   const bounceVariants = {
     idle: {
       y: [0, -4, 0],
@@ -146,16 +233,18 @@ const Pet = ({ petState = 'idle', onPet }) => {
   return (
     <motion.div
       className="pet-container"
-      drag
-      dragMomentum={false}
       style={{
         position: 'absolute',
-        cursor: 'grab',
-        x: position.x,
-        y: position.y,
+        left: position.x,
+        top: position.y + jumpY,
+        cursor: isHovered ? 'pointer' : 'default',
+        width: PET_SIZE,
+        height: PET_SIZE,
+        transition: isJumping ? 'top 0.2s ease-out' : 'none',
       }}
-      whileDrag={{ cursor: 'grabbing' }}
       onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <div style={{ position: 'relative', display: 'inline-block' }}>
         <Emotes emoteQueue={emoteQueue} />
