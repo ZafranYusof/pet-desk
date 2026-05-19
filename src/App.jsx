@@ -13,6 +13,21 @@ import { sprites, speciesConfig, speciesAccessoryOffsets } from './data/sprites'
 import { accessories } from './data/accessories';
 import { loadPet, loadPetAsync, savePet } from './services/petStorage';
 import { tick, feed, play, pet, sleep, calculateLevel, checkUnlocks, switchSpecies, equipAccessory, unequipAccessory } from './services/petEngine';
+import { getTimeOfDay, shouldAutoSleep } from './services/timeService';
+import { getWeather } from './services/weatherService';
+import { getPersonality, applyPersonalityToTick, shouldIgnoreClick } from './services/personality';
+import { generateEntry, saveDiaryEntry, hasEntryToday } from './services/diaryService';
+import { checkAndNotify, notifyLevelUp, recordInteraction } from './services/notificationService';
+import Particles from './components/Particles';
+import WeatherOverlay from './components/WeatherOverlay';
+import PetDiary from './components/PetDiary';
+import Achievements from './components/Achievements';
+import AchievementPopup from './components/AchievementPopup';
+import DailyReward from './components/DailyReward';
+import Scrapbook from './components/Scrapbook';
+import { checkAchievements, getStats, incrementStat, recordGameWin } from './services/achievementService';
+import { checkDailyReward } from './services/dailyRewards';
+import { recordFirstFeed, recordFirstPlay, recordFirstPet, recordLevelUp, recordSpeciesUnlock, recordAccessoryEquip, recordAchievement, recordStreak, recordGameWin as recordGameWinScrapbook } from './services/scrapbookService';
 
 // Map pet state to sprite key based on species
 function getSpriteKey(petState, frameRef) {
@@ -45,18 +60,91 @@ function getMoodSprite(mood, species) {
   }
 }
 
+// Daily stats storage key
+const DAILY_STATS_KEY = 'petdesk_daily_stats';
+
+function getDefaultDailyStats() {
+  return {
+    date: new Date().toISOString().split('T')[0],
+    timesFed: 0,
+    timesPlayed: 0,
+    timesPetted: 0,
+    gamesPlayed: 0,
+    minutesAsleep: 0,
+    previousLevel: null,
+  };
+}
+
+function loadDailyStats() {
+  try {
+    const stored = localStorage.getItem(DAILY_STATS_KEY);
+    if (stored) {
+      const stats = JSON.parse(stored);
+      const today = new Date().toISOString().split('T')[0];
+      if (stats.date === today) return stats;
+    }
+  } catch (e) { /* ignore */ }
+  return getDefaultDailyStats();
+}
+
+function saveDailyStats(stats) {
+  try {
+    localStorage.setItem(DAILY_STATS_KEY, JSON.stringify(stats));
+  } catch (e) { /* ignore */ }
+}
+
 function App() {
   const [petState, setPetState] = useState(() => loadPet());
   const [showStats, setShowStats] = useState(false);
   const [showPetSelector, setShowPetSelector] = useState(false);
   const [showAccessoryShop, setShowAccessoryShop] = useState(false);
+  const [showDiary, setShowDiary] = useState(false);
+  const [showAchievements, setShowAchievements] = useState(false);
+  const [showScrapbook, setShowScrapbook] = useState(false);
+  const [showDailyReward, setShowDailyReward] = useState(false);
+  const [achievementPopup, setAchievementPopup] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [currentSprite, setCurrentSprite] = useState('slime_idle');
   const [levelUpLevel, setLevelUpLevel] = useState(null);
+  const [timeOfDay, setTimeOfDay] = useState(() => getTimeOfDay());
+  const [weather, setWeather] = useState(() => getWeather());
+  const [justPetted, setJustPetted] = useState(false);
   const { emoteQueue, addEmote } = useEmotes();
   const idleSecondsRef = useRef(0);
   const actionTimeoutRef = useRef(null);
   const frameRef = useRef(0);
+  const dailyStatsRef = useRef(loadDailyStats());
+  const notificationIntervalRef = useRef(null);
+  const diaryCheckRef = useRef(null);
+  const achievementQueueRef = useRef([]);
+
+  // Update time of day every 60s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeOfDay(getTimeOfDay());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Update weather every 60s (checks if 2h passed internally)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setWeather(getWeather());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Auto-sleep at night
+  useEffect(() => {
+    if (shouldAutoSleep() && petState.state !== 'sleeping') {
+      setPetState((prev) => {
+        if (prev.state !== 'sleeping') {
+          return { ...prev, state: 'sleeping' };
+        }
+        return prev;
+      });
+    }
+  }, [timeOfDay]);
 
   // Ensure pet state has new fields (migration for existing saves)
   useEffect(() => {
@@ -89,16 +177,62 @@ function App() {
     savePet(petState);
   }, [petState]);
 
-  // Tick every 5 seconds
+  // Check daily reward on mount
+  useEffect(() => {
+    const reward = checkDailyReward();
+    if (reward) {
+      const timer = setTimeout(() => setShowDailyReward(true), 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Tick every 5 seconds (with personality modifiers)
   useEffect(() => {
     const interval = setInterval(() => {
       setPetState((prev) => {
-        const updated = tick(prev, idleSecondsRef.current);
+        let updated = tick(prev, idleSecondsRef.current);
+        const personality = getPersonality(prev.species || 'slime');
+        updated = applyPersonalityToTick(updated, personality);
+
+        // Track sleep minutes
+        if (updated.state === 'sleeping') {
+          dailyStatsRef.current.minutesAsleep = (dailyStatsRef.current.minutesAsleep || 0) + (5 / 60);
+          saveDailyStats(dailyStatsRef.current);
+        }
+
         return updated;
       });
     }, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // Notification check every 60 seconds
+  useEffect(() => {
+    notificationIntervalRef.current = setInterval(() => {
+      checkAndNotify(petState);
+    }, 60000);
+    return () => {
+      if (notificationIntervalRef.current) clearInterval(notificationIntervalRef.current);
+    };
+  }, [petState]);
+
+  // Diary: generate entry at midnight and reset daily stats
+  useEffect(() => {
+    const checkMidnight = setInterval(() => {
+      const today = new Date().toISOString().split('T')[0];
+      if (dailyStatsRef.current.date !== today) {
+        // Generate diary entry for the previous day
+        if (!hasEntryToday()) {
+          const entry = generateEntry(petState, dailyStatsRef.current);
+          saveDiaryEntry(entry);
+        }
+        dailyStatsRef.current = getDefaultDailyStats();
+        dailyStatsRef.current.previousLevel = petState.level;
+        saveDailyStats(dailyStatsRef.current);
+      }
+    }, 60000);
+    return () => clearInterval(checkMidnight);
+  }, [petState]);
 
   // Update sprite based on state (deterministic frame counter)
   useEffect(() => {
@@ -138,10 +272,15 @@ function App() {
           return updated;
         });
         addEmote('heart');
+        recordInteraction();
+        dailyStatsRef.current.timesFed = (dailyStatsRef.current.timesFed || 0) + 1;
+        saveDailyStats(dailyStatsRef.current);
         clearActionTimeout();
         actionTimeoutRef.current = setTimeout(() => {
           setPetState((prev) => ({ ...prev, state: 'idle' }));
         }, 3000);
+        { const s = incrementStat('timesFed'); runAchievementCheck(s); }
+        recordFirstFeed();
         break;
 
       case 'play':
@@ -151,10 +290,15 @@ function App() {
           return updated;
         });
         addEmote('music');
+        recordInteraction();
+        dailyStatsRef.current.timesPlayed = (dailyStatsRef.current.timesPlayed || 0) + 1;
+        saveDailyStats(dailyStatsRef.current);
         clearActionTimeout();
         actionTimeoutRef.current = setTimeout(() => {
           setPetState((prev) => ({ ...prev, state: 'idle' }));
         }, 3000);
+        { const s = incrementStat('timesPlayed'); runAchievementCheck(s); }
+        recordFirstPlay();
         break;
 
       case 'sleep':
@@ -170,7 +314,25 @@ function App() {
         setShowStats(true);
         break;
 
+      case 'diary':
+        setShowDiary((prev) => !prev);
+        break;
+
+      case 'achievements':
+        setShowAchievements((prev) => !prev);
+        break;
+
+      case 'scrapbook':
+        setShowScrapbook((prev) => !prev);
+        break;
+
       default:
+        // Handle game actions
+        if (action && action.startsWith('game:')) {
+          recordInteraction();
+          dailyStatsRef.current.gamesPlayed = (dailyStatsRef.current.gamesPlayed || 0) + 1;
+          saveDailyStats(dailyStatsRef.current);
+        }
         break;
     }
   }, [addEmote]);
@@ -185,21 +347,78 @@ function App() {
   function checkLevelUp(prev, updated) {
     if (updated.level > prev.level) {
       setLevelUpLevel(updated.level);
+      notifyLevelUp(updated.level);
       // Check for new unlocks
-      const { petState: withUnlocks } = checkUnlocks(updated);
+      const { petState: withUnlocks, newUnlocks } = checkUnlocks(updated);
       setPetState(withUnlocks);
+      // Scrapbook entries
+      recordLevelUp(updated.level);
+      if (newUnlocks) {
+        newUnlocks.forEach((unlock) => {
+          if (unlock.type === 'species') recordSpeciesUnlock(unlock.name);
+        });
+      }
+      // Re-check achievements
+      const stats = getStats();
+      runAchievementCheck(stats);
     }
   }
 
-  // Pet interaction (click)
+  // Run achievement check and queue popups
+  function runAchievementCheck(stats) {
+    setPetState((current) => {
+      const newlyUnlocked = checkAchievements(current, stats);
+      if (newlyUnlocked.length > 0) {
+        newlyUnlocked.forEach((a) => {
+          recordAchievement(a.name, a.icon);
+          achievementQueueRef.current.push(a);
+        });
+        showNextAchievement();
+      }
+      return current;
+    });
+  }
+
+  function showNextAchievement() {
+    if (achievementPopup) return;
+    const next = achievementQueueRef.current.shift();
+    if (next) {
+      setAchievementPopup(next);
+    }
+  }
+
+  function handleAchievementDismiss() {
+    setAchievementPopup(null);
+    setTimeout(() => {
+      const next = achievementQueueRef.current.shift();
+      if (next) setAchievementPopup(next);
+    }, 300);
+  }
+
+  // Pet interaction (click) with personality
   const handlePetClick = useCallback(() => {
+    const personality = getPersonality(petState.species || 'slime');
+
+    // Cat might ignore clicks
+    if (shouldIgnoreClick(personality)) {
+      addEmote('sweat'); // "hmph" reaction
+      return;
+    }
+
     setPetState((prev) => {
       const updated = pet(prev);
       checkLevelUp(prev, updated);
       return updated;
     });
     addEmote('star');
-  }, [addEmote]);
+    recordInteraction();
+    dailyStatsRef.current.timesPetted = (dailyStatsRef.current.timesPetted || 0) + 1;
+    saveDailyStats(dailyStatsRef.current);
+    setJustPetted(true);
+    setTimeout(() => setJustPetted(false), 2000);
+    recordFirstPet();
+    { const s = getStats(); runAchievementCheck(s); }
+  }, [addEmote, petState.species]);
 
   // Right-click context menu
   const handleContextMenu = useCallback((e) => {
@@ -231,6 +450,8 @@ function App() {
 
   const handleEquipAccessory = useCallback((accId) => {
     setPetState((prev) => equipAccessory(prev, accId));
+    recordAccessoryEquip(accId);
+    { const s = getStats(); runAchievementCheck(s); }
   }, []);
 
   const handleUnequipAccessory = useCallback((accId) => {
@@ -251,6 +472,9 @@ function App() {
       style={{ background: 'transparent' }}
       onContextMenu={handleContextMenu}
     >
+      {/* Weather overlay */}
+      <WeatherOverlay weather={weather} />
+
       {/* Pet sprite area */}
       <div
         className="absolute inset-0 flex items-center justify-center cursor-pointer"
@@ -260,6 +484,15 @@ function App() {
       >
         {/* Emotes floating above */}
         <Emotes emoteQueue={emoteQueue} />
+
+        {/* Particle effects */}
+        <Particles type="sparkles" active={petState.happiness > 80 && weather === 'sunny'} />
+        <Particles type="hearts" active={justPetted} />
+        <Particles type="raindrops" active={weather === 'rainy' || weather === 'stormy'} />
+        <Particles type="snow" active={weather === 'snowy'} />
+        <Particles type="fire" active={petState.hunger !== undefined && petState.hunger < 20} />
+        <Particles type="zzz" active={petState.state === 'sleeping'} />
+        <Particles type="music" active={petState.state === 'dancing'} />
 
         {/* The pet with accessories */}
         <div className="relative">
@@ -332,6 +565,52 @@ function App() {
             onEquip={handleEquipAccessory}
             onUnequip={handleUnequipAccessory}
             onClose={() => setShowAccessoryShop(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Pet Diary */}
+      <AnimatePresence>
+        {showDiary && (
+          <PetDiary onClose={() => setShowDiary(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Achievements panel */}
+      <AnimatePresence>
+        {showAchievements && (
+          <Achievements onClose={() => setShowAchievements(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Scrapbook */}
+      <AnimatePresence>
+        {showScrapbook && (
+          <Scrapbook onClose={() => setShowScrapbook(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Daily Reward popup */}
+      <AnimatePresence>
+        {showDailyReward && (
+          <DailyReward
+            petState={petState}
+            onClaim={(updated) => {
+              setPetState(updated);
+              const s = getStats();
+              runAchievementCheck(s);
+            }}
+            onClose={() => setShowDailyReward(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Achievement unlock popup */}
+      <AnimatePresence>
+        {achievementPopup && (
+          <AchievementPopup
+            achievement={achievementPopup}
+            onDismiss={handleAchievementDismiss}
           />
         )}
       </AnimatePresence>

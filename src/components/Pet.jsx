@@ -3,6 +3,7 @@ import { motion, useAnimationControls } from 'framer-motion';
 import PetSprite from './PetSprite';
 import Emotes, { useEmotes } from './Emotes';
 import sprites from '../data/sprites';
+import { getPersonality } from '../services/personality';
 
 const ANIMATION_FRAMES = {
   idle: ['slime_idle', 'slime_idle2'],
@@ -29,7 +30,7 @@ const EDGE_PADDING = 50;
 const WALK_SPEED = 2; // px per frame at 60fps
 const GRAVITY_OFFSET = 150; // pet stays near bottom
 
-const Pet = ({ petState = 'idle', onPet, onBounce, screenWidth = 1920, screenHeight = 1080 }) => {
+const Pet = ({ petState = 'idle', species = 'slime', onPet, onBounce, screenWidth = 1920, screenHeight = 1080, timeOfDay = 'afternoon', weather = 'sunny' }) => {
   const [frameIndex, setFrameIndex] = useState(0);
   const [position, setPosition] = useState(() => ({
     x: Math.floor((screenWidth - PET_SIZE) / 2),
@@ -39,12 +40,16 @@ const Pet = ({ petState = 'idle', onPet, onBounce, screenWidth = 1920, screenHei
   const [isJumping, setIsJumping] = useState(false);
   const [walkDirection, setWalkDirection] = useState(1); // 1 = right, -1 = left
   const [isHovered, setIsHovered] = useState(false);
+  const [ghostOpacity, setGhostOpacity] = useState(1);
 
   const walkTimerRef = useRef(null);
   const animFrameRef = useRef(null);
   const targetRef = useRef(null);
   const idleTimerRef = useRef(null);
+  const [isShaking, setIsShaking] = useState(false);
   const { emoteQueue, addEmote } = useEmotes();
+
+  const personality = getPersonality(species);
 
   // Determine current state (walking overrides idle)
   const currentState = isWalking ? 'walking' : petState;
@@ -67,6 +72,39 @@ const Pet = ({ petState = 'idle', onPet, onBounce, screenWidth = 1920, screenHei
     return targetX;
   }, [screenWidth]);
 
+  // Walk speed modifier based on time of day
+  const walkSpeedModifier = timeOfDay === 'night' ? 0.5 : timeOfDay === 'evening' ? 0.8 : timeOfDay === 'morning' ? 1.3 : 1.0;
+  const effectiveWalkSpeed = WALK_SPEED * walkSpeedModifier;
+
+  // Stormy weather shaking effect
+  useEffect(() => {
+    if (weather === 'stormy') {
+      setIsShaking(true);
+    } else {
+      setIsShaking(false);
+    }
+  }, [weather]);
+
+  // Weather-based emotes
+  useEffect(() => {
+    if (weather === 'rainy') {
+      const timer = setInterval(() => addEmote('sweat'), 8000);
+      return () => clearInterval(timer);
+    }
+    if (weather === 'stormy') {
+      const timer = setInterval(() => addEmote('sweat'), 4000);
+      return () => clearInterval(timer);
+    }
+  }, [weather, addEmote]);
+
+  // Evening yawning
+  useEffect(() => {
+    if (timeOfDay === 'evening') {
+      const timer = setInterval(() => addEmote('zzz'), 30000);
+      return () => clearInterval(timer);
+    }
+  }, [timeOfDay, addEmote]);
+
   // Walking logic using requestAnimationFrame
   useEffect(() => {
     if (!isWalking || targetRef.current === null) return;
@@ -84,7 +122,7 @@ const Pet = ({ petState = 'idle', onPet, onBounce, screenWidth = 1920, screenHei
         const dx = target - prev.x;
         const dist = Math.abs(dx);
 
-        if (dist < WALK_SPEED * 2) {
+        if (dist < effectiveWalkSpeed * 2) {
           // Arrived at destination
           targetRef.current = null;
           setIsWalking(false);
@@ -93,7 +131,7 @@ const Pet = ({ petState = 'idle', onPet, onBounce, screenWidth = 1920, screenHei
 
         const dir = dx > 0 ? 1 : -1;
         setWalkDirection(dir);
-        return { ...prev, x: prev.x + dir * WALK_SPEED * delta };
+        return { ...prev, x: prev.x + dir * effectiveWalkSpeed * delta };
       });
 
       if (targetRef.current !== null) {
@@ -105,12 +143,13 @@ const Pet = ({ petState = 'idle', onPet, onBounce, screenWidth = 1920, screenHei
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [isWalking]);
+  }, [isWalking, effectiveWalkSpeed]);
 
-  // Schedule walking behavior: idle 5-15s, then walk to new destination
+  // Schedule walking behavior: idle time modified by personality
   useEffect(() => {
     const scheduleNextWalk = () => {
-      const idleTime = (Math.random() * 10 + 5) * 1000; // 5-15s
+      const baseIdle = (Math.random() * 10 + 5) * 1000; // 5-15s
+      const idleTime = baseIdle / (personality.walkFrequencyMultiplier || 1);
       idleTimerRef.current = setTimeout(() => {
         if (petState === 'idle' || petState === 'happy') {
           const dest = pickNewDestination();
@@ -125,7 +164,7 @@ const Pet = ({ petState = 'idle', onPet, onBounce, screenWidth = 1920, screenHei
     return () => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
-  }, [petState, pickNewDestination]);
+  }, [petState, pickNewDestination, personality.walkFrequencyMultiplier]);
 
   // Stop walking when state changes to sleeping/eating/dancing
   useEffect(() => {
@@ -136,10 +175,11 @@ const Pet = ({ petState = 'idle', onPet, onBounce, screenWidth = 1920, screenHei
     }
   }, [petState]);
 
-  // Occasional jump (every 20-40s when idle)
+  // Occasional jump (frequency modified by personality bounciness)
   useEffect(() => {
     const scheduleJump = () => {
-      const delay = (Math.random() * 20 + 20) * 1000;
+      const baseDelay = (Math.random() * 20 + 20) * 1000;
+      const delay = baseDelay / (personality.bounceFrequencyMultiplier || 1);
       const timer = setTimeout(() => {
         if ((petState === 'idle' || petState === 'happy') && !isWalking) {
           setIsJumping(true);
@@ -153,7 +193,37 @@ const Pet = ({ petState = 'idle', onPet, onBounce, screenWidth = 1920, screenHei
 
     const timer = scheduleJump();
     return () => clearTimeout(timer);
-  }, [petState, isWalking, onBounce]);
+  }, [petState, isWalking, onBounce, personality.bounceFrequencyMultiplier]);
+
+  // Ghost special: flicker (opacity 0.3 for 1s)
+  useEffect(() => {
+    if (species !== 'ghost') return;
+    const interval = setInterval(() => {
+      if (Math.random() < (personality.flickerChance || 0)) {
+        setGhostOpacity(0.3);
+        setTimeout(() => setGhostOpacity(1), 1000);
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [species, personality.flickerChance]);
+
+  // Ghost special: teleport to random position
+  useEffect(() => {
+    if (species !== 'ghost') return;
+    const interval = setInterval(() => {
+      if (Math.random() < (personality.teleportChance || 0)) {
+        const minX = EDGE_PADDING;
+        const maxX = screenWidth - PET_SIZE - EDGE_PADDING;
+        const newX = Math.floor(Math.random() * (maxX - minX)) + minX;
+        setGhostOpacity(0.1);
+        setTimeout(() => {
+          setPosition((prev) => ({ ...prev, x: newX }));
+          setGhostOpacity(1);
+        }, 300);
+      }
+    }, 60000); // Check once per minute
+    return () => clearInterval(interval);
+  }, [species, personality.teleportChance, screenWidth]);
 
   // Emotes based on state
   useEffect(() => {
@@ -195,8 +265,13 @@ const Pet = ({ petState = 'idle', onPet, onBounce, screenWidth = 1920, screenHei
 
   const currentSprite = sprites[frames[frameIndex % frames.length]];
 
-  // Jump animation
-  const jumpY = isJumping ? -30 : 0;
+  // Jump animation (height modified by personality)
+  const jumpY = isJumping ? -30 * (personality.bounceHeightMultiplier || 1) : 0;
+
+  // Shaking animation for stormy weather
+  const shakeStyle = isShaking ? {
+    animation: 'shake 0.3s infinite',
+  } : {};
 
   // Bounce animation variants
   const bounceVariants = {
@@ -241,6 +316,7 @@ const Pet = ({ petState = 'idle', onPet, onBounce, screenWidth = 1920, screenHei
         width: PET_SIZE,
         height: PET_SIZE,
         transition: isJumping ? 'top 0.2s ease-out' : 'none',
+        opacity: ghostOpacity,
       }}
       onClick={handleClick}
       onMouseEnter={handleMouseEnter}
@@ -253,6 +329,7 @@ const Pet = ({ petState = 'idle', onPet, onBounce, screenWidth = 1920, screenHei
           variants={bounceVariants}
           style={{
             transform: walkDirection === -1 ? 'scaleX(-1)' : 'scaleX(1)',
+            ...shakeStyle,
           }}
         >
           <PetSprite sprite={currentSprite} scale={1} />

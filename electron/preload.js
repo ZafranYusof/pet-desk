@@ -29,4 +29,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Mouse events toggle (for interaction areas)
   setIgnoreMouse: (ignore) => ipcRenderer.send('set-ignore-mouse', ignore),
+
+  // Desktop notifications
+  showNotification: (message) => ipcRenderer.invoke('show-notification', message),
 });

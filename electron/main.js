@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, powerMonitor, ipcMain, Tray } = require('electron');
+const { app, BrowserWindow, globalShortcut, powerMonitor, ipcMain, Tray, Notification } = require('electron');
 const path = require('path');
 const { createTray } = require('./tray');
 
@@ -130,6 +130,19 @@ ipcMain.on('set-ignore-mouse', (event, ignore) => {
   if (mainWindow) {
     mainWindow.setIgnoreMouseEvents(ignore, { forward: true });
   }
+});
+
+// Desktop notifications
+ipcMain.handle('show-notification', (_e, message) => {
+  if (Notification.isSupported()) {
+    const notification = new Notification({
+      title: 'PetDesk',
+      body: message,
+      silent: false,
+    });
+    notification.show();
+  }
+  return true;
 });
 
 app.whenReady().then(() => {
