@@ -1,0 +1,3 @@
+mutation {
+  unpinItem(input: { pinnableItemId: "R_kgDOSRye6A" }) { clientMutationId }
+}

@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+﻿const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // Pet state persistence (via IPC to main process store)
@@ -30,6 +30,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Mouse events toggle (for interaction areas)
   setIgnoreMouse: (ignore) => ipcRenderer.send('set-ignore-mouse', ignore),
 
+
+  // Activity events (desktop buddy)
+  onActivityEvent: (callback) => {
+    ipcRenderer.on('activity-event', (event, data) => callback(data));
+  },
+
   // Desktop notifications
   showNotification: (message) => ipcRenderer.invoke('show-notification', message),
 });
+

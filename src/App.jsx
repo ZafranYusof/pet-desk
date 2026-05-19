@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Pet from './components/Pet';
 import StatsPanel from './components/StatsPanel';
@@ -31,13 +31,20 @@ import SpriteEditor from './components/SpriteEditor';
 import FoodMenu from './components/FoodMenu';
 import BirthdayEvent from './components/BirthdayEvent';
 import SoundSettings from './components/SoundSettings';
+import StoryMode from './components/StoryMode';
+import DesktopReaction from './components/DesktopReaction';
+import { getReaction } from './services/desktopBuddyService';
 import StatsDashboard from './components/StatsDashboard';
+import BattleArena from './components/BattleArena';
 import { getActiveCustomSpriteData, getActiveCustomSprite } from './services/customSpriteService';
+import { getBattleRewards, getBattleLossPenalty, getWinStreak } from './services/battleService';
 import { checkAchievements, getStats, incrementStat, recordGameWin } from './services/achievementService';
 import { getActiveHabitat, setActiveHabitat, getHabitatMoodBonus } from './services/habitatService';
 import Habitat from './components/Habitat';
 import HabitatSelector from './components/HabitatSelector';
+import Garden from './components/Garden';
 import { checkDailyReward } from './services/dailyRewards';
+import { tickGarden, getGardenNotifications, getGarden } from './services/gardenService';
 import { recordFirstFeed, recordFirstPlay, recordFirstPet, recordLevelUp, recordSpeciesUnlock, recordAccessoryEquip, recordAchievement, recordStreak, recordGameWin as recordGameWinScrapbook } from './services/scrapbookService';
 import { recordInteraction as recordStatsInteraction, recordLevelUp as recordStatsLevelUp, recordEvolution as recordStatsEvolution, recordAchievementUnlock as recordStatsAchievement, recordGamePlayed as recordStatsGame, recordGameWin as recordStatsGameWin, startPlaytimeTracking, stopPlaytimeTracking } from './services/statsService';
 
@@ -92,7 +99,11 @@ function App() {
   const [feedMessage, setFeedMessage] = useState(null);
   const [showSoundSettings, setShowSoundSettings] = useState(false);
   const [showStatsDashboard, setShowStatsDashboard] = useState(false);
+  const [showBattle, setShowBattle] = useState(false);
   const [showHabitatSelector, setShowHabitatSelector] = useState(false);
+  const [showStory, setShowStory] = useState(false);
+  const [desktopReaction, setDesktopReaction] = useState(null);
+  const [showGarden, setShowGarden] = useState(false);
   const [activeHabitat, setActiveHabitatState] = useState(() => getActiveHabitat());
   const [activeCustomSpriteName, setActiveCustomSpriteName] = useState(() => getActiveCustomSprite());
   const [achievementPopup, setAchievementPopup] = useState(null);
@@ -223,6 +234,24 @@ function App() {
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeOfDay(getTimeOfDay());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Tick garden every 60 seconds (check growth, wither, notifications)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      tickGarden();
+      // Check for garden notifications
+      const plots = getGarden();
+      const notifications = getGardenNotifications(plots);
+      notifications.forEach((n) => {
+        if (n.type === 'harvest' && window.electronAPI?.showNotification) {
+          window.electronAPI.showNotification(`${n.plantEmoji} ${n.plantName} is ready to harvest!`);
+        } else if (n.type === 'water' && window.electronAPI?.showNotification) {
+          window.electronAPI.showNotification(`${n.plantEmoji} ${n.plantName} needs water! ðŸ’§`);
+        }
+      });
     }, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -393,6 +422,13 @@ function App() {
     window.electronAPI.onPetAction?.((action) => {
       handleAction(action);
     });
+
+    window.electronAPI.onActivityEvent?.((data) => {
+      const reaction = getReaction(data.type, data);
+      if (reaction) {
+        setDesktopReaction(reaction);
+      }
+    });
   }, []);
 
   // Handle actions (from context menu or tray)
@@ -472,6 +508,10 @@ function App() {
         setShowStats(true);
         break;
 
+      case 'story':
+        setShowStory((prev) => !prev);
+        break;
+
       case 'diary':
         setShowDiary((prev) => !prev);
         break;
@@ -482,6 +522,14 @@ function App() {
 
       case 'scrapbook':
         setShowScrapbook((prev) => !prev);
+        break;
+
+      case 'garden':
+        setShowGarden((prev) => !prev);
+        break;
+
+      case 'battle':
+        setShowBattle(true);
         break;
 
       case 'habitat':
@@ -926,6 +974,33 @@ function App() {
         )}
       </AnimatePresence>
 
+      {/* Story Mode */}
+      <AnimatePresence>
+        {showStory && (
+          <StoryMode
+            petLevel={petState.level || 1}
+            onClose={() => setShowStory(false)}
+            onEffect={(effects) => {
+              setPetState((prev) => {
+                const updated = { ...prev };
+                if (effects.happiness) updated.happiness = Math.min(100, (updated.happiness || 0) + effects.happiness);
+                if (effects.energy) updated.energy = Math.min(100, (updated.energy || 0) + effects.energy);
+                if (effects.xp) {
+                  updated.xp = (updated.xp || 0) + effects.xp;
+                  updated.level = calculateLevel(updated.xp);
+                }
+                return updated;
+              });
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Desktop Buddy Reaction */}
+      <DesktopReaction
+        reaction={desktopReaction}
+        onDismiss={() => setDesktopReaction(null)}
+      />
       {/* Sound Settings */}
       <AnimatePresence>
         {showSoundSettings && (
@@ -937,6 +1012,34 @@ function App() {
       <AnimatePresence>
         {showStatsDashboard && (
           <StatsDashboard onClose={() => setShowStatsDashboard(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Battle Arena */}
+      <AnimatePresence>
+        {showBattle && (
+          <BattleArena
+            petState={petState}
+            onClose={() => setShowBattle(false)}
+            onBattleEnd={(result, opponentLevel) => {
+              setShowBattle(false);
+              if (result === 'win') {
+                const rewards = getBattleRewards(opponentLevel);
+                setPetState((prev) => {
+                  const updated = { ...prev };
+                  updated.xp = (updated.xp || 0) + rewards.xp;
+                  updated.level = calculateLevel(updated.xp);
+                  return updated;
+                });
+              } else if (result === 'lose') {
+                const penalty = getBattleLossPenalty();
+                setPetState((prev) => ({
+                  ...prev,
+                  happiness: Math.max(0, (prev.happiness || 100) - penalty.happinessLoss),
+                }));
+              }
+            }}
+          />
         )}
       </AnimatePresence>
 
@@ -952,6 +1055,35 @@ function App() {
             onCreate={handleCreatePet}
             onDelete={handleDeletePet}
             onClose={() => setShowPetSlots(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Garden */}
+      <AnimatePresence>
+        {showGarden && (
+          <Garden
+            level={petState.level || 1}
+            onClose={() => setShowGarden(false)}
+            onReward={(reward) => {
+              setPetState((prev) => {
+                const updated = { ...prev };
+                if (reward.happiness) updated.happiness = Math.min(100, (updated.happiness || 0) + reward.happiness);
+                if (reward.hunger) updated.hunger = Math.min(100, (updated.hunger || 0) + reward.hunger);
+                if (reward.energy) updated.energy = Math.min(100, (updated.energy || 0) + reward.energy);
+                if (reward.xp) {
+                  updated.xp = (updated.xp || 0) + reward.xp;
+                  updated.level = calculateLevel(updated.xp);
+                }
+                if (reward.type === 'accessory' || reward.type === 'accessory_special') {
+                  const accId = reward.accessoryId || 'crystal-pendant';
+                  if (!updated.unlockedAccessories?.includes(accId)) {
+                    updated.unlockedAccessories = [...(updated.unlockedAccessories || []), accId];
+                  }
+                }
+                return updated;
+              });
+            }}
           />
         )}
       </AnimatePresence>
@@ -1023,3 +1155,6 @@ function App() {
 }
 
 export default App;
+
+
+

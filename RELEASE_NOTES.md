@@ -1,37 +1,38 @@
-## PetDesk v0.2.0 - Evolution, Multi-Pet & Creativity
+## PetDesk v0.3.0 - Habitats, Food & Sound
 
 ### New Features
 
-**Pet Evolution System**
-- 3 evolution stages per species at levels 15, 25, and 40
-- 90 unique evolved pixel art sprites with distinct palettes and shapes
-- Epic evolution cutscene with particles, flash, and confetti
-- Evolution progress shown in stats panel
-- Slime → Gel Knight → Slime King → Cosmic Slime
-- Cat → Shadow Cat → Thunder Cat → Celestial Cat
-- Ghost → Phantom → Wraith → Ethereal
+**Habitat/Room System**
+- 6 themed habitats: Desktop, Forest, Space, Ocean, Castle, Neon City
+- CSS-only animated backgrounds (trees, stars, waves, torches, neon rain)
+- Unlock habitats as you level up (lvl 3-25)
+- Each habitat gives mood/energy bonuses
+- Renders in bottom 200px strip, doesn't block desktop
 
-**Multi-Pet Mode**
-- Own up to 3 pets (slots unlock at level 10 and 20)
-- Summon a companion to roam alongside your primary pet
-- 6 base interactions: play, chase, nap, dance, argue, gift
-- 5 species-specific interactions: slime merge, cat groom, ghost phase, and more
-- Companion renders at 0.8x scale with name tag
+**Food System**
+- 12 food types: 3 basic, 5 unlockable, 4 special
+- Timed effects: XP multiplier, speed boost, dance trigger
+- Species bonuses (cats love fish, ghosts barely eat)
+- Special food inventory earned from daily rewards/achievements
+- Mystery Meat with random effects
 
-**Desktop Widget**
-- Floating widget near pet with 5 modes
-- Clock (digital time + date)
-- Weather (simulated weather + mood)
-- Pet Stats (mini hunger/energy/happiness bars)
-- Todo List (3 items, click to add/toggle/delete)
-- Pomodoro Timer (25min work / 5min break with SVG progress)
+**Pet Aging & Birthday**
+- Pet ages in real days (baby → young → adult → elder)
+- Age affects behavior: babies hungrier, elders sleepier with XP wisdom bonus
+- Birthday celebration on anniversary (confetti, fireworks, rewards)
+- Age displayed in stats panel
 
-**Custom Sprite Editor**
-- Full 16x16 pixel art editor
-- 16 colors + transparent, 4 tools (pencil, eraser, fill, picker)
-- 10 sprite state tabs (idle, walk, happy, sad, sleep, eat, dance)
-- Undo support (20 steps), grid toggle, animated preview
-- Save up to 5 custom sprites, use as active pet
+**Sound Customization**
+- 4 sound packs: Retro (8-bit), Cute (soft), Sci-Fi (electronic), Nature (organic)
+- Volume slider (0-100) with live preview
+- Mute toggle
+- Each pack has 8 unique sound events
+
+**Stats & Analytics Dashboard**
+- Lifetime stats: total playtime, interactions, feeds, games
+- 7-day activity bar chart (CSS-only)
+- Fun facts: favorite food, longest session, win rate
+- Records: highest level, total XP, highest streak
 
 ### Install
 ```bash

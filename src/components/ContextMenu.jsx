@@ -1,28 +1,31 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const gameOptions = [
-  { id: 'catchFood', icon: '🍎', label: 'Catch Food' },
-  { id: 'memoryMatch', icon: '🃏', label: 'Memory Match' },
-  { id: 'quickTap', icon: '🎯', label: 'Quick Tap' },
+  { id: 'catchFood', icon: 'ðŸŽ', label: 'Catch Food' },
+  { id: 'memoryMatch', icon: 'ðŸƒ', label: 'Memory Match' },
+  { id: 'quickTap', icon: 'ðŸŽ¯', label: 'Quick Tap' },
 ];
 
 const menuItems = [
-  { id: 'food', icon: '🍽️', label: 'Food', disableCheck: (state) => state?.hunger > 90 },
-  { id: 'play', icon: '🎮', label: 'Play', disableCheck: (state) => state?.energy < 10 },
-  { id: 'games', icon: '🕹️', label: 'Play Game', disableCheck: (state) => state?.energy < 10 },
-  { id: 'sleep', icon: '😴', label: 'Sleep' },
-  { id: 'pets', icon: '👥', label: 'Pets' },
-  { id: 'widget', icon: '📊', label: 'Widget' },
-  { id: 'spriteEditor', icon: '🎨', label: 'Sprite Editor' },
-  { id: 'diary', icon: '📖', label: 'Diary' },
-  { id: 'achievements', icon: '🏆', label: 'Achievements' },
-  { id: 'scrapbook', icon: '📸', label: 'Scrapbook' },
-  { id: 'habitat', icon: '🏠', label: 'Habitat' },
-  { id: 'sound', icon: '🔊', label: 'Sound' },
-  { id: 'lifetimeStats', icon: '📈', label: 'Stats' },
-  { id: 'rename', icon: '✏️', label: 'Rename' },
-  { id: 'close', icon: '❌', label: 'Close' },
+  { id: 'food', icon: 'ðŸ½ï¸', label: 'Food', disableCheck: (state) => state?.hunger > 90 },
+  { id: 'play', icon: 'ðŸŽ®', label: 'Play', disableCheck: (state) => state?.energy < 10 },
+  { id: 'games', icon: 'ðŸ•¹ï¸', label: 'Play Game', disableCheck: (state) => state?.energy < 10 },
+  { id: 'battle', icon: 'âš”ï¸', label: 'Battle', disableCheck: (state) => state?.energy < 10 },
+  { id: 'sleep', icon: 'ðŸ˜´', label: 'Sleep' },
+  { id: 'pets', icon: 'ðŸ‘¥', label: 'Pets' },
+  { id: 'widget', icon: 'ðŸ“Š', label: 'Widget' },
+  { id: 'spriteEditor', icon: 'ðŸŽ¨', label: 'Sprite Editor' },
+  { id: 'story', icon: '📖', label: 'Story' },
+  { id: 'diary', icon: 'ðŸ“–', label: 'Diary' },
+  { id: 'achievements', icon: 'ðŸ†', label: 'Achievements' },
+  { id: 'scrapbook', icon: 'ðŸ“¸', label: 'Scrapbook' },
+  { id: 'garden', icon: 'ðŸŒ±', label: 'Garden' },
+  { id: 'habitat', icon: 'ðŸ ', label: 'Habitat' },
+  { id: 'sound', icon: 'ðŸ”Š', label: 'Sound' },
+  { id: 'lifetimeStats', icon: 'ðŸ“ˆ', label: 'Stats' },
+  { id: 'rename', icon: 'âœï¸', label: 'Rename' },
+  { id: 'close', icon: 'âŒ', label: 'Close' },
 ];
 
 function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
@@ -56,7 +59,7 @@ function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
             className="w-full px-4 py-2 flex items-center gap-3 text-sm text-gray-400 hover:bg-gray-700/60 cursor-pointer"
             onClick={() => setShowGames(false)}
           >
-            <span className="text-base">←</span>
+            <span className="text-base">â†</span>
             <span>Back</span>
           </button>
           {gameOptions.map((game) => (
@@ -122,3 +125,4 @@ function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
 }
 
 export default ContextMenu;
+

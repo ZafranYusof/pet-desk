@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, powerMonitor, ipcMain, Tray, Notification } = require('electron');
+﻿const { app, BrowserWindow, globalShortcut, powerMonitor, ipcMain, Tray, Notification } = require('electron');
 const path = require('path');
 const { createTray } = require('./tray');
 
@@ -12,6 +12,9 @@ let mainWindow = null;
 let tray = null;
 let idleCheckInterval = null;
 let lastIdleState = 'active'; // 'active' or 'idle'
+let lastActiveWindow = '';
+let sessionStartTime = Date.now();
+let activityCheckInterval = null;
 
 const isDev = !app.isPackaged;
 
@@ -68,6 +71,13 @@ function startIdleDetection() {
       lastIdleState = newState;
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('idle-state-changed', { state: newState, idleSeconds });
+        // Send activity events for desktop buddy
+        if (newState === 'idle') {
+          mainWindow.webContents.send('activity-event', { type: 'idle', idleSeconds });
+        } else {
+          mainWindow.webContents.send('activity-event', { type: 'active', idleSeconds });
+          sessionStartTime = Date.now();
+        }
       }
     }
 
@@ -145,6 +155,27 @@ ipcMain.handle('show-notification', (_e, message) => {
   return true;
 });
 
+
+function startActivityDetection() {
+  activityCheckInterval = setInterval(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+
+    // Check active window title
+    try {
+      const focused = BrowserWindow.getFocusedWindow();
+      // We can't get external window titles easily in Electron without native modules
+      // Instead, track idle/active transitions and session duration
+    } catch (e) {}
+
+    // Check for long session (2 hours)
+    const sessionDuration = Date.now() - sessionStartTime;
+    if (sessionDuration > 7200000) { // 2 hours
+      mainWindow.webContents.send('activity-event', { type: 'long-session', duration: sessionDuration });
+      sessionStartTime = Date.now(); // Reset so it doesn't spam
+    }
+  }, 30000); // Check every 30 seconds
+}
+
 app.whenReady().then(() => {
   createWindow();
 
@@ -164,6 +195,9 @@ app.whenReady().then(() => {
 
   // Start idle detection
   startIdleDetection();
+
+  // Start activity detection
+  startActivityDetection();
 });
 
 // Second instance handling
@@ -184,3 +218,4 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
