@@ -1,38 +1,38 @@
-## PetDesk v0.3.0 - Habitats, Food & Sound
+## PetDesk v0.4.0 - Battles, Garden & Story
 
 ### New Features
 
-**Habitat/Room System**
-- 6 themed habitats: Desktop, Forest, Space, Ocean, Castle, Neon City
-- CSS-only animated backgrounds (trees, stars, waves, torches, neon rain)
-- Unlock habitats as you level up (lvl 3-25)
-- Each habitat gives mood/energy bonuses
-- Renders in bottom 200px strip, doesn't block desktop
+**Pet Battle System**
+- Turn-based RPG combat vs AI-generated opponents
+- 4 moves per species (2 basic + 2 special) with MP costs
+- Evolution damage scaling + ultimate move at evo stage 2+
+- AI behavior adapts based on HP% (smarter when desperate)
+- Win streak tracking with bonus rewards (3/5/10 streak milestones)
+- Full battle UI with HP/MP bars, attack animations, sound effects
 
-**Food System**
-- 12 food types: 3 basic, 5 unlockable, 4 special
-- Timed effects: XP multiplier, speed boost, dance trigger
-- Species bonuses (cats love fish, ghosts barely eat)
-- Special food inventory earned from daily rewards/achievements
-- Mystery Meat with random effects
+**Pet Garden/Farm**
+- 8 plant types: Sunflower, Carrot, Berry Bush, Golden Wheat, Crystal Flower, Moon Fruit, Star Seed, Rainbow Rose
+- Real-time growth (1h to 24h depending on plant)
+- 6 plots (unlock more with level)
+- Watering mechanic with wither penalty if neglected
+- Harvest rewards: stats, food items, accessories, XP
+- Desktop notifications when plants ready or thirsty
 
-**Pet Aging & Birthday**
-- Pet ages in real days (baby → young → adult → elder)
-- Age affects behavior: babies hungrier, elders sleepier with XP wisdom bonus
-- Birthday celebration on anniversary (confetti, fireworks, rewards)
-- Age displayed in stats panel
+**Pet Story Mode**
+- 10-chapter narrative adventure through digital worlds
+- Branching choices that affect pet stats
+- Typewriter text effect with CSS scene illustrations
+- Level-gated chapters (Lv.1 through Lv.30)
+- Chapter rewards: XP, food, exclusive accessories, titles
+- Chapters: The Awakening, Icon Forest, Taskbar Tunnels, Recycle Bin Dungeon, Browser Ocean, RAM Mountains, Virus Invasion, Cloud Kingdom, The Dark Web, The Source Code
 
-**Sound Customization**
-- 4 sound packs: Retro (8-bit), Cute (soft), Sci-Fi (electronic), Nature (organic)
-- Volume slider (0-100) with live preview
-- Mute toggle
-- Each pack has 8 unique sound events
-
-**Stats & Analytics Dashboard**
-- Lifetime stats: total playtime, interactions, feeds, games
-- 7-day activity bar chart (CSS-only)
-- Fun facts: favorite food, longest session, win rate
-- Records: highest level, total XP, highest streak
+**Desktop Automation Buddy**
+- Pet reacts to your PC activity in real-time
+- Detects: coding, gaming, entertainment, browsing, work apps
+- Celebrates when you return from idle
+- Reminds you to take breaks after 2+ hours
+- Speech bubble reactions with 5-minute cooldown
+- Non-intrusive, auto-dismisses after 4 seconds
 
 ### Install
 ```bash

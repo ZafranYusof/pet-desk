@@ -43,7 +43,20 @@ import { getActiveHabitat, setActiveHabitat, getHabitatMoodBonus } from './servi
 import Habitat from './components/Habitat';
 import HabitatSelector from './components/HabitatSelector';
 import Garden from './components/Garden';
+import PetRoom from './components/PetRoom';
+import { getRoomBonus, addCoins, getCoins } from './services/housingService';
+import CraftingTable from './components/CraftingTable';
+import WeatherEvent from './components/WeatherEvent';
 import { checkDailyReward } from './services/dailyRewards';
+
+import JobBoard from './components/JobBoard';
+import Arcade from './components/Arcade';
+import FlappyPet from './games/FlappyPet';
+import SnakeGame from './games/SnakeGame';
+import BlockStack from './games/BlockStack';
+import { checkJobComplete, collectJobReward, getJobProgress } from './services/jobService';
+import { saveHighScore, recordGamePlayed } from './services/arcadeService';import { addMaterial } from './services/craftingService';
+import { checkForEvent, getActiveEvent, endEvent } from './services/weatherEventService';
 import { tickGarden, getGardenNotifications, getGarden } from './services/gardenService';
 import { recordFirstFeed, recordFirstPlay, recordFirstPet, recordLevelUp, recordSpeciesUnlock, recordAccessoryEquip, recordAchievement, recordStreak, recordGameWin as recordGameWinScrapbook } from './services/scrapbookService';
 import { recordInteraction as recordStatsInteraction, recordLevelUp as recordStatsLevelUp, recordEvolution as recordStatsEvolution, recordAchievementUnlock as recordStatsAchievement, recordGamePlayed as recordStatsGame, recordGameWin as recordStatsGameWin, startPlaytimeTracking, stopPlaytimeTracking } from './services/statsService';
@@ -104,6 +117,12 @@ function App() {
   const [showStory, setShowStory] = useState(false);
   const [desktopReaction, setDesktopReaction] = useState(null);
   const [showGarden, setShowGarden] = useState(false);
+
+  const [showJobBoard, setShowJobBoard] = useState(false);
+  const [showArcade, setShowArcade] = useState(false);
+  const [activeGame, setActiveGame] = useState(null);  const [showPetRoom, setShowPetRoom] = useState(false);
+  const [showCrafting, setShowCrafting] = useState(false);
+  const [activeWeatherEvent, setActiveWeatherEvent] = useState(() => getActiveEvent());
   const [activeHabitat, setActiveHabitatState] = useState(() => getActiveHabitat());
   const [activeCustomSpriteName, setActiveCustomSpriteName] = useState(() => getActiveCustomSprite());
   const [achievementPopup, setAchievementPopup] = useState(null);
@@ -256,6 +275,27 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Check job completion every 60 seconds
+  useEffect(() => {
+    // Check on mount
+    const jobStatus = checkJobComplete();
+    if (jobStatus && jobStatus.complete) {
+      if (window.electronAPI?.showNotification) {
+        window.electronAPI.showNotification('💼 Job shift complete! Collect your reward.');
+      }
+    }
+
+    const interval = setInterval(() => {
+      const status = checkJobComplete();
+      if (status && status.complete) {
+        if (window.electronAPI?.showNotification) {
+          window.electronAPI.showNotification('💼 Job shift complete! Collect your reward.');
+        }
+      }
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Update weather every 60s (checks if 2h passed internally)
   useEffect(() => {
     const interval = setInterval(() => {
@@ -263,6 +303,19 @@ function App() {
     }, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  // Check for weather events every 30 minutes
+  useEffect(() => {
+    // Check on mount
+    const event = checkForEvent(timeOfDay, weather);
+    if (event) setActiveWeatherEvent(event);
+
+    const interval = setInterval(() => {
+      const evt = checkForEvent(timeOfDay, weather);
+      if (evt) setActiveWeatherEvent(evt);
+    }, 30 * 60 * 1000); // 30 minutes
+    return () => clearInterval(interval);
+  }, [timeOfDay, weather]);
 
   // Auto-sleep at night
   useEffect(() => {
@@ -364,6 +417,15 @@ function App() {
         }
         if (habitatBonus.energy) {
           updated.energy = Math.min(100, updated.energy + habitatBonus.energy);
+        }
+
+        // Apply room bonuses
+        const roomBonus = getRoomBonus();
+        if (roomBonus.happiness) {
+          updated.happiness = Math.min(100, updated.happiness + roomBonus.happiness);
+        }
+        if (roomBonus.energy) {
+          updated.energy = Math.min(100, updated.energy + roomBonus.energy);
         }
 
         // Track sleep minutes
@@ -526,6 +588,22 @@ function App() {
 
       case 'garden':
         setShowGarden((prev) => !prev);
+        break;
+
+      case 'jobs':
+        setShowJobBoard((prev) => !prev);
+        break;
+
+      case 'arcade':
+        setShowArcade((prev) => !prev);
+        break;
+
+      case 'room':
+        setShowPetRoom((prev) => !prev);
+        break;
+
+      case 'craft':
+        setShowCrafting((prev) => !prev);
         break;
 
       case 'battle':
@@ -1031,6 +1109,8 @@ function App() {
                   updated.level = calculateLevel(updated.xp);
                   return updated;
                 });
+                // Award coins for battle win
+                addCoins(10);
               } else if (result === 'lose') {
                 const penalty = getBattleLossPenalty();
                 setPetState((prev) => ({
@@ -1055,6 +1135,81 @@ function App() {
             onCreate={handleCreatePet}
             onDelete={handleDeletePet}
             onClose={() => setShowPetSlots(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Crafting Table */}
+      <AnimatePresence>
+        {showCrafting && (
+          <CraftingTable
+            petLevel={petState.level || 1}
+            onCraftResult={(result, recipe) => {
+              if (result.type === 'accessory') {
+                setPetState((prev) => {
+                  const updated = { ...prev };
+                  if (!updated.unlockedAccessories?.includes(result.id)) {
+                    updated.unlockedAccessories = [...(updated.unlockedAccessories || []), result.id];
+                  }
+                  return updated;
+                });
+              } else if (result.type === 'food') {
+                setPetState((prev) => {
+                  const updated = { ...prev };
+                  if (result.effect.hunger) updated.hunger = Math.min(100, (updated.hunger || 0) + result.effect.hunger);
+                  if (result.effect.energy) updated.energy = Math.min(100, (updated.energy || 0) + result.effect.energy);
+                  if (result.effect.happiness) updated.happiness = Math.min(100, (updated.happiness || 0) + result.effect.happiness);
+                  if (result.effect.xp) {
+                    updated.xp = (updated.xp || 0) + result.effect.xp;
+                    updated.level = calculateLevel(updated.xp);
+                  }
+                  return updated;
+                });
+              } else if (result.type === 'boost' || result.type === 'special') {
+                setPetState((prev) => {
+                  const updated = { ...prev };
+                  if (result.effect.allStats) {
+                    updated.hunger = Math.min(100, (updated.hunger || 0) + result.effect.allStats);
+                    updated.energy = Math.min(100, (updated.energy || 0) + result.effect.allStats);
+                    updated.happiness = Math.min(100, (updated.happiness || 0) + result.effect.allStats);
+                  }
+                  if (result.effect.xpMultiplier) {
+                    updated.xp = (updated.xp || 0) + 25;
+                    updated.level = calculateLevel(updated.xp);
+                  }
+                  return updated;
+                });
+              }
+            }}
+            onClose={() => setShowCrafting(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Weather Event */}
+      <WeatherEvent
+        activeEvent={activeWeatherEvent}
+        onCollectReward={(rewards) => {
+          setPetState((prev) => {
+            const updated = { ...prev };
+            if (rewards.xp) {
+              updated.xp = (updated.xp || 0) + rewards.xp;
+              updated.level = calculateLevel(updated.xp);
+            }
+            if (rewards.happiness) updated.happiness = Math.min(100, (updated.happiness || 0) + rewards.happiness);
+            if (rewards.energy) updated.energy = Math.min(100, (updated.energy || 0) + rewards.energy);
+            return updated;
+          });
+        }}
+        onEventEnd={() => setActiveWeatherEvent(null)}
+      />
+
+      {/* Pet Room */}
+      <AnimatePresence>
+        {showPetRoom && (
+          <PetRoom
+            petLevel={petState.level || 1}
+            onClose={() => setShowPetRoom(false)}
           />
         )}
       </AnimatePresence>
@@ -1100,6 +1255,102 @@ function App() {
               setShowHabitatSelector(false);
             }}
             onClose={() => setShowHabitatSelector(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Job Board */}
+      <AnimatePresence>
+        {showJobBoard && (
+          <JobBoard
+            petState={petState}
+            onClose={() => setShowJobBoard(false)}
+            onReward={(rewards) => {
+              setPetState((prev) => {
+                const updated = { ...prev };
+                updated.xp = (updated.xp || 0) + (rewards.xp || 0);
+                updated.level = calculateLevel(updated.xp);
+                return updated;
+              });
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Arcade */}
+      <AnimatePresence>
+        {showArcade && !activeGame && (
+          <Arcade
+            petState={petState}
+            onClose={() => setShowArcade(false)}
+            onPlayGame={(gameId) => {
+              setShowArcade(false);
+              setActiveGame(gameId);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Arcade Games */}
+      <AnimatePresence>
+        {activeGame === 'flappyPet' && (
+          <FlappyPet
+            onBack={() => { setActiveGame(null); setShowArcade(true); }}
+            onGameEnd={(score) => {
+              saveHighScore('flappyPet', score);
+              recordGamePlayed(score);
+              const xpGain = Math.floor(score / 10);
+              if (xpGain > 0) {
+                setPetState((prev) => {
+                  const updated = { ...prev };
+                  updated.xp = (updated.xp || 0) + xpGain;
+                  updated.level = calculateLevel(updated.xp);
+                  return updated;
+                });
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {activeGame === 'snake' && (
+          <SnakeGame
+            onBack={() => { setActiveGame(null); setShowArcade(true); }}
+            onGameEnd={(score) => {
+              saveHighScore('snake', score);
+              recordGamePlayed(score);
+              const xpGain = Math.floor(score / 10);
+              if (xpGain > 0) {
+                setPetState((prev) => {
+                  const updated = { ...prev };
+                  updated.xp = (updated.xp || 0) + xpGain;
+                  updated.level = calculateLevel(updated.xp);
+                  return updated;
+                });
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {activeGame === 'blockStack' && (
+          <BlockStack
+            onBack={() => { setActiveGame(null); setShowArcade(true); }}
+            onGameEnd={(score) => {
+              saveHighScore('blockStack', score);
+              recordGamePlayed(score);
+              const xpGain = Math.floor(score / 10);
+              if (xpGain > 0) {
+                setPetState((prev) => {
+                  const updated = { ...prev };
+                  updated.xp = (updated.xp || 0) + xpGain;
+                  updated.level = calculateLevel(updated.xp);
+                  return updated;
+                });
+              }
+            }}
           />
         )}
       </AnimatePresence>
