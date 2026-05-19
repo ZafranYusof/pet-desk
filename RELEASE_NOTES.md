@@ -1,38 +1,37 @@
-## PetDesk v0.4.0 - Battles, Garden & Story
+## PetDesk v0.5.0 - Crafting, Jobs & Arcade
 
 ### New Features
 
-**Pet Battle System**
-- Turn-based RPG combat vs AI-generated opponents
-- 4 moves per species (2 basic + 2 special) with MP costs
-- Evolution damage scaling + ultimate move at evo stage 2+
-- AI behavior adapts based on HP% (smarter when desperate)
-- Win streak tracking with bonus rewards (3/5/10 streak milestones)
-- Full battle UI with HP/MP bars, attack animations, sound effects
+**Crafting System**
+- 8 material types earned from battles, garden, events, and daily rewards
+- 15 recipes: accessories, food, boosts, and a legendary Rainbow Gem
+- Recipe discovery mechanic (hidden until you find materials)
+- Sparkle animation on successful craft
 
-**Pet Garden/Farm**
-- 8 plant types: Sunflower, Carrot, Berry Bush, Golden Wheat, Crystal Flower, Moon Fruit, Star Seed, Rainbow Rose
-- Real-time growth (1h to 24h depending on plant)
-- 6 plots (unlock more with level)
-- Watering mechanic with wither penalty if neglected
-- Harvest rewards: stats, food items, accessories, XP
-- Desktop notifications when plants ready or thirsty
+**Rare Weather Events**
+- 6 events: Meteor Shower, Aurora Borealis, Thunderstorm, Rainbow, Snowstorm, Solar Eclipse
+- Each with unique visual effects and material/XP rewards
+- Solar Eclipse is ultra-rare (1%) with jackpot rewards
+- Conditions: some require night, day, or specific weather
 
-**Pet Story Mode**
-- 10-chapter narrative adventure through digital worlds
-- Branching choices that affect pet stats
-- Typewriter text effect with CSS scene illustrations
-- Level-gated chapters (Lv.1 through Lv.30)
-- Chapter rewards: XP, food, exclusive accessories, titles
-- Chapters: The Awakening, Icon Forest, Taskbar Tunnels, Recycle Bin Dungeon, Browser Ocean, RAM Mountains, Virus Invasion, Cloud Kingdom, The Dark Web, The Source Code
+**Pet Jobs/Career**
+- 6 jobs: Pixel Artist, Code Monkey, Garden Keeper, Battle Trainer, Star Explorer, Royal Advisor
+- Real-time shifts (1-6 hours), earn passive XP + materials while away
+- Job progress persists even when app is closed
+- Desktop notification when shift completes
 
-**Desktop Automation Buddy**
-- Pet reacts to your PC activity in real-time
-- Detects: coding, gaming, entertainment, browsing, work apps
-- Celebrates when you return from idle
-- Reminds you to take breaks after 2+ hours
-- Speech bubble reactions with 5-minute cooldown
-- Non-intrusive, auto-dismisses after 4 seconds
+**Minigame Arcade**
+- Flappy Pet: flappy bird with your pet sprite, scaling difficulty
+- Snake: classic 15x15 grid, WASD/arrow controls, speed ramp
+- Block Stack: Tetris-lite with 4 pieces, line clearing, levels
+- High score tracking + XP rewards (score/10)
+
+**Pet Housing/Decoration**
+- 24 furniture items across 6 categories (beds, tables, decor, floor, wallpaper)
+- 8x6 grid room with edit mode and arrow-key placement
+- Coins system: earn from battles, spend on furniture
+- Animated furniture: lava lamp, fish tank, neon sign, RGB desk
+- Room bonuses: energy, happiness, XP modifiers from placed items
 
 ### Install
 ```bash

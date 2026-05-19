@@ -57,9 +57,14 @@ import BlockStack from './games/BlockStack';
 import { checkJobComplete, collectJobReward, getJobProgress } from './services/jobService';
 import { saveHighScore, recordGamePlayed } from './services/arcadeService';import { addMaterial } from './services/craftingService';
 import { checkForEvent, getActiveEvent, endEvent } from './services/weatherEventService';
+import BreedingLab from './components/BreedingLab';
+import { ChatBubble, ChatLog } from './components/PetChat';
+import { generateMessage, getGreeting, getIdleChat, saveChatMessage } from './services/petChatService';
 import { tickGarden, getGardenNotifications, getGarden } from './services/gardenService';
 import { recordFirstFeed, recordFirstPlay, recordFirstPet, recordLevelUp, recordSpeciesUnlock, recordAccessoryEquip, recordAchievement, recordStreak, recordGameWin as recordGameWinScrapbook } from './services/scrapbookService';
 import { recordInteraction as recordStatsInteraction, recordLevelUp as recordStatsLevelUp, recordEvolution as recordStatsEvolution, recordAchievementUnlock as recordStatsAchievement, recordGamePlayed as recordStatsGame, recordGameWin as recordStatsGameWin, startPlaytimeTracking, stopPlaytimeTracking } from './services/statsService';
+import { updateFakePlayers, syncPlayerScores, submitScore } from './services/leaderboardService';
+import Leaderboard from './components/Leaderboard';
 
 
 // Daily stats storage key
@@ -113,6 +118,8 @@ function App() {
   const [showSoundSettings, setShowSoundSettings] = useState(false);
   const [showStatsDashboard, setShowStatsDashboard] = useState(false);
   const [showBattle, setShowBattle] = useState(false);
+  const [showDungeon, setShowDungeon] = useState(false);
+  const [showPhotoMode, setShowPhotoMode] = useState(false);
   const [showHabitatSelector, setShowHabitatSelector] = useState(false);
   const [showStory, setShowStory] = useState(false);
   const [desktopReaction, setDesktopReaction] = useState(null);
@@ -122,6 +129,11 @@ function App() {
   const [showArcade, setShowArcade] = useState(false);
   const [activeGame, setActiveGame] = useState(null);  const [showPetRoom, setShowPetRoom] = useState(false);
   const [showCrafting, setShowCrafting] = useState(false);
+  const [showBreedingLab, setShowBreedingLab] = useState(false);
+  const [showChatLog, setShowChatLog] = useState(false);
+  const [chatBubble, setChatBubble] = useState(null);
+  const chatTimerRef = useRef(null);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [activeWeatherEvent, setActiveWeatherEvent] = useState(() => getActiveEvent());
   const [activeHabitat, setActiveHabitatState] = useState(() => getActiveHabitat());
   const [activeCustomSpriteName, setActiveCustomSpriteName] = useState(() => getActiveCustomSprite());
@@ -329,6 +341,42 @@ function App() {
     }
   }, [timeOfDay]);
 
+  
+  // Pet chat: random message every 2-5 minutes
+  useEffect(() => {
+    function scheduleChatMessage() {
+      const delay = 120000 + Math.random() * 180000; // 2-5 minutes
+      chatTimerRef.current = setTimeout(() => {
+        const msg = getIdleChat(petState);
+        if (msg) {
+          setChatBubble(msg);
+          saveChatMessage(msg);
+        }
+        scheduleChatMessage();
+      }, delay);
+    }
+    scheduleChatMessage();
+    return () => {
+      if (chatTimerRef.current) clearTimeout(chatTimerRef.current);
+    };
+  }, [petState.species, petState.happiness]);
+
+  // Chat greeting on mount
+  useEffect(() => {
+    const hour = new Date().getHours();
+    let timeOfDayStr = 'morning';
+    if (hour >= 12 && hour < 18) timeOfDayStr = 'afternoon';
+    else if (hour >= 18 && hour < 22) timeOfDayStr = 'evening';
+    else if (hour >= 22 || hour < 6) timeOfDayStr = 'night';
+    const greeting = getGreeting(petState, timeOfDayStr);
+    if (greeting) {
+      setTimeout(() => {
+        setChatBubble(greeting);
+        saveChatMessage(greeting);
+      }, 2000);
+    }
+  }, []);
+
   // Ensure pet state has new fields (migration for existing saves)
   useEffect(() => {
     setPetState((prev) => ({
@@ -375,6 +423,12 @@ function App() {
     if (!agingData) {
       agingData = initAgingData(petState.createdAt);
     }
+  }, []);
+
+  // Update leaderboard fake players on mount (daily)
+  useEffect(() => {
+    updateFakePlayers();
+    syncPlayerScores(petState, getStats());
   }, []);
 
   // Check birthday on mount
@@ -606,8 +660,20 @@ function App() {
         setShowCrafting((prev) => !prev);
         break;
 
+
+      case 'leaderboard':
+        setShowLeaderboard((prev) => !prev);
+        break;
       case 'battle':
         setShowBattle(true);
+        break;
+
+      case 'dungeon':
+        setShowDungeon(true);
+        break;
+
+      case 'photo':
+        setShowPhotoMode(true);
         break;
 
       case 'habitat':
@@ -658,6 +724,8 @@ function App() {
     if (updated.level > prev.level) {
       setLevelUpLevel(updated.level);
       notifyLevelUp(updated.level);
+      submitScore('level', updated.level);
+      submitScore('totalXp', updated.xp || 0);
       // Check for evolution
       const evoData = checkEvolutionOnLevelUp(updated, prev.level, updated.level);
       if (evoData) {
@@ -874,6 +942,17 @@ function App() {
         onPositionChange={setPrimaryPosition}
       />
 
+      {/* Pet Chat Bubble */}
+      <AnimatePresence>
+        {chatBubble && (
+          <ChatBubble
+            message={chatBubble}
+            species={petState.species || 'slime'}
+            onDismiss={() => setChatBubble(null)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Companion pet */}
       {companionState && (
         <Pet
@@ -1086,6 +1165,17 @@ function App() {
         )}
       </AnimatePresence>
 
+      
+      {/* Leaderboard */}
+      <AnimatePresence>
+        {showLeaderboard && (
+          <Leaderboard
+            petName={petState.name || 'You'}
+            onClose={() => setShowLeaderboard(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Stats Dashboard */}
       <AnimatePresence>
         {showStatsDashboard && (
@@ -1111,6 +1201,10 @@ function App() {
                 });
                 // Award coins for battle win
                 addCoins(10);
+                // Update leaderboard
+                const stats = getStats();
+                submitScore('battleWins', stats.battlesWon || 0);
+                syncPlayerScores(petState, stats);
               } else if (result === 'lose') {
                 const penalty = getBattleLossPenalty();
                 setPetState((prev) => ({
@@ -1298,6 +1392,7 @@ function App() {
             onBack={() => { setActiveGame(null); setShowArcade(true); }}
             onGameEnd={(score) => {
               saveHighScore('flappyPet', score);
+              submitScore('arcadeHighScore', score);
               recordGamePlayed(score);
               const xpGain = Math.floor(score / 10);
               if (xpGain > 0) {
@@ -1319,6 +1414,7 @@ function App() {
             onBack={() => { setActiveGame(null); setShowArcade(true); }}
             onGameEnd={(score) => {
               saveHighScore('snake', score);
+              submitScore('arcadeHighScore', score);
               recordGamePlayed(score);
               const xpGain = Math.floor(score / 10);
               if (xpGain > 0) {
@@ -1340,6 +1436,7 @@ function App() {
             onBack={() => { setActiveGame(null); setShowArcade(true); }}
             onGameEnd={(score) => {
               saveHighScore('blockStack', score);
+              submitScore('arcadeHighScore', score);
               recordGamePlayed(score);
               const xpGain = Math.floor(score / 10);
               if (xpGain > 0) {
@@ -1351,6 +1448,87 @@ function App() {
                 });
               }
             }}
+          />
+        )}
+      </AnimatePresence>
+
+
+      {/* Dungeon Crawler */}
+      <AnimatePresence>
+        {showDungeon && (
+          <DungeonCrawler
+            petState={petState}
+            onClose={() => setShowDungeon(false)}
+            onReward={(rewards) => {
+              setShowDungeon(false);
+              setPetState((prev) => {
+                const updated = { ...prev };
+                updated.xp = (updated.xp || 0) + (rewards.xp || 0);
+                updated.level = calculateLevel(updated.xp);
+                return updated;
+              });
+              if (rewards.coins) addDungeonCoins(rewards.coins);
+              // Check for accessory drops
+              if (rewards.inventory) {
+                rewards.inventory.forEach((item) => {
+                  if (item.type === 'accessory') {
+                    setPetState((prev) => {
+                      const updated = { ...prev };
+                      if (!updated.unlockedAccessories?.includes(item.id)) {
+                        updated.unlockedAccessories = [...(updated.unlockedAccessories || []), item.id];
+                      }
+                      return updated;
+                    });
+                  }
+                });
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Photo Mode */}
+      <AnimatePresence>
+        {showPhotoMode && (
+          <PhotoMode
+            petState={petState}
+            onClose={() => setShowPhotoMode(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Breeding Lab */}
+      <AnimatePresence>
+        {showBreedingLab && (
+          <BreedingLab
+            petState={petState}
+            onBreedComplete={(hybrid) => {
+              // Add hybrid to pet slots
+              const slots = getPetSlots();
+              for (let i = 0; i < slots.length; i++) {
+                if (slots[i] === null) {
+                  slots[i] = hybrid;
+                  savePetSlots(slots);
+                  setPetSlots(slots);
+                  break;
+                }
+              }
+              setShowBreedingLab(false);
+              const chatMsg = generateMessage(petState, 'levelup');
+              if (chatMsg) { setChatBubble(chatMsg); saveChatMessage(chatMsg); }
+            }}
+            onClose={() => setShowBreedingLab(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Chat Log */}
+      <AnimatePresence>
+        {showChatLog && (
+          <ChatLog
+            species={petState.species || 'slime'}
+            petName={petState.name}
+            onClose={() => setShowChatLog(false)}
           />
         )}
       </AnimatePresence>
