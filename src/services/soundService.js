@@ -1,12 +1,18 @@
-// Sound service using Web Audio API - generates retro tones, no audio files needed
+// Sound service using Web Audio API - generates tones with sound pack support
+import { getPackById } from './soundPacks';
 
 let audioCtx = null;
-let masterVolume = parseFloat(localStorage.getItem('petdesk-volume') ?? '0.3');
-let isMuted = localStorage.getItem('petdesk-muted') === 'true';
+let masterGain = null;
+let masterVolume = parseInt(localStorage.getItem('petdesk-volume') ?? '70', 10);
+let isMutedState = localStorage.getItem('petdesk-muted') === 'true';
+let activePackId = localStorage.getItem('petdesk-soundpack') || 'retro';
 
 function getContext() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.connect(audioCtx.destination);
+    updateMasterGain();
   }
   if (audioCtx.state === 'suspended') {
     audioCtx.resume();
@@ -14,9 +20,16 @@ function getContext() {
   return audioCtx;
 }
 
-function getGain() {
-  if (isMuted) return 0;
-  return masterVolume;
+function getMasterGain() {
+  getContext();
+  return masterGain;
+}
+
+function updateMasterGain() {
+  if (masterGain) {
+    const vol = isMutedState ? 0 : masterVolume / 100;
+    masterGain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  }
 }
 
 function playTone(frequency, duration, type = 'square', opts = {}) {
@@ -25,10 +38,10 @@ function playTone(frequency, duration, type = 'square', opts = {}) {
   const gain = ctx.createGain();
 
   osc.type = type;
-  osc.frequency.setValueAtTime(frequency, ctx.currentTime);
+  osc.frequency.setValueAtTime(frequency, ctx.currentTime + (opts.delay || 0));
 
   if (opts.freqEnd !== undefined) {
-    osc.frequency.linearRampToValueAtTime(opts.freqEnd, ctx.currentTime + duration);
+    osc.frequency.linearRampToValueAtTime(opts.freqEnd, ctx.currentTime + (opts.delay || 0) + duration);
   }
 
   if (opts.wobble) {
@@ -38,90 +51,127 @@ function playTone(frequency, duration, type = 'square', opts = {}) {
     lfoGain.gain.setValueAtTime(opts.wobble.depth || 50, ctx.currentTime);
     lfo.connect(lfoGain);
     lfoGain.connect(osc.frequency);
-    lfo.start(ctx.currentTime);
-    lfo.stop(ctx.currentTime + duration);
+    lfo.start(ctx.currentTime + (opts.delay || 0));
+    lfo.stop(ctx.currentTime + (opts.delay || 0) + duration);
   }
 
-  const vol = getGain();
-  gain.gain.setValueAtTime(vol, ctx.currentTime);
+  const volScale = opts.volumeScale !== undefined ? opts.volumeScale : 1;
+  const startTime = ctx.currentTime + (opts.delay || 0);
+
+  gain.gain.setValueAtTime(0.3 * volScale, startTime);
 
   if (opts.fadeOut) {
-    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+    gain.gain.linearRampToValueAtTime(0, startTime + duration);
   } else {
-    gain.gain.setValueAtTime(vol, ctx.currentTime + duration - 0.01);
-    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+    gain.gain.setValueAtTime(0.3 * volScale, startTime + duration - 0.01);
+    gain.gain.linearRampToValueAtTime(0, startTime + duration);
   }
 
   osc.connect(gain);
-  gain.connect(ctx.destination);
+  gain.connect(getMasterGain());
 
-  osc.start(ctx.currentTime + (opts.delay || 0));
-  osc.stop(ctx.currentTime + (opts.delay || 0) + duration);
+  osc.start(startTime);
+  osc.stop(startTime + duration);
 }
 
-const sounds = {
-  // Short high beep - when petted
-  chirp() {
-    playTone(800, 0.1, 'square');
-  },
+function playPackSound(eventName) {
+  if (isMutedState) return;
+  const pack = getPackById(activePackId);
+  const tones = pack.sounds[eventName];
+  if (!tones) return;
 
-  // Low crunch wobble - when fed
-  munch() {
-    playTone(200, 0.3, 'sawtooth', { wobble: { rate: 30, depth: 80 } });
-  },
-
-  // Ascending arpeggio C-E-G-C - level up
-  levelUp() {
-    playTone(523, 0.1, 'square', { delay: 0 });
-    playTone(659, 0.1, 'square', { delay: 0.1 });
-    playTone(784, 0.1, 'square', { delay: 0.2 });
-    playTone(1047, 0.15, 'square', { delay: 0.3 });
-  },
-
-  // Low slow wave - sleeping
-  snore() {
-    playTone(100, 0.5, 'sine', { fadeOut: true });
-  },
-
-  // Quick pitch drop - jump/bounce
-  bounce() {
-    playTone(600, 0.15, 'square', { freqEnd: 200 });
-  },
-
-  // Two quick chirps - happy
-  happy() {
-    playTone(600, 0.08, 'square', { delay: 0 });
-    playTone(800, 0.08, 'square', { delay: 0.1 });
-  },
-};
-
-export function playSound(name) {
-  if (isMuted) return;
-  const fn = sounds[name];
-  if (fn) {
-    try {
-      fn();
-    } catch (e) {
-      // Silently fail - audio not critical
-    }
+  try {
+    tones.forEach((tone) => {
+      playTone(tone.freq, tone.duration, tone.type, {
+        delay: tone.delay || 0,
+        freqEnd: tone.freqEnd,
+        wobble: tone.wobble,
+        fadeOut: tone.fadeOut,
+        volumeScale: tone.volumeScale,
+      });
+    });
+  } catch (e) {
+    // Silently fail - audio not critical
   }
 }
 
+// Legacy sound name mapping to pack events
+const legacySoundMap = {
+  chirp: 'pet',
+  munch: 'feed',
+  levelUp: 'levelUp',
+  snore: 'sleep',
+  bounce: 'bounce',
+  happy: 'play',
+};
+
+export function playSound(name) {
+  if (isMutedState) return;
+  const eventName = legacySoundMap[name] || name;
+  playPackSound(eventName);
+}
+
+// Preview all sounds in a pack quickly
+export function previewPack(packId) {
+  const pack = getPackById(packId);
+  const events = Object.keys(pack.sounds);
+  let delay = 0;
+  const ctx = getContext();
+
+  events.forEach((eventName) => {
+    const tones = pack.sounds[eventName];
+    if (!tones) return;
+
+    tones.forEach((tone) => {
+      const totalDelay = delay + (tone.delay || 0);
+      playTone(tone.freq, tone.duration, tone.type, {
+        delay: totalDelay,
+        freqEnd: tone.freqEnd,
+        wobble: tone.wobble,
+        fadeOut: tone.fadeOut,
+        volumeScale: tone.volumeScale,
+      });
+    });
+
+    // Calculate max duration of this event's tones
+    const maxDur = Math.max(...tones.map((t) => (t.delay || 0) + t.duration));
+    delay += maxDur + 0.15; // gap between sounds
+  });
+}
+
+// Volume control (0-100)
 export function setVolume(vol) {
-  masterVolume = Math.max(0, Math.min(1, vol));
+  masterVolume = Math.max(0, Math.min(100, Math.round(vol)));
   localStorage.setItem('petdesk-volume', String(masterVolume));
+  updateMasterGain();
 }
 
 export function getVolume() {
   return masterVolume;
 }
 
+// Mute control
+export function setMute(muted) {
+  isMutedState = !!muted;
+  localStorage.setItem('petdesk-muted', String(isMutedState));
+  updateMasterGain();
+}
+
 export function toggleMute() {
-  isMuted = !isMuted;
-  localStorage.setItem('petdesk-muted', String(isMuted));
-  return isMuted;
+  setMute(!isMutedState);
+  return isMutedState;
 }
 
 export function getMuted() {
-  return isMuted;
+  return isMutedState;
+}
+
+// Sound pack control
+export function setSoundPack(packId) {
+  activePackId = packId;
+  localStorage.setItem('petdesk-soundpack', packId);
+}
+
+export function getActivePack() {
+  return activePackId;
 }

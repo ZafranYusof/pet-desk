@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import Pet from './components/Pet';
 import StatsPanel from './components/StatsPanel';
 import ContextMenu from './components/ContextMenu';
@@ -11,6 +11,8 @@ import PetInteraction, { pickInteraction } from './components/PetInteraction';
 import { loadPet, loadPetAsync, savePet, loadAllPets, saveAllPets } from './services/petStorage';
 import { getPetSlots, savePetSlots, createNewPet, deletePet, summonCompanion, dismissCompanion, getCompanion, saveSlotState } from './services/multiPetService';
 import { tick, feed, play, pet, sleep, calculateLevel, checkUnlocks, checkEvolutionOnLevelUp, switchSpecies, equipAccessory, unequipAccessory } from './services/petEngine';
+import { tickEffects, getActiveEffects, hasActiveEffect, addToInventory } from './services/foodService';
+import { getAgingData, initAgingData, getPetAge, getAgeStage, getAgeStageInfo, getAgeMoodModifier, shouldCelebrateBirthday, markBirthdayCelebrated, getBirthdayRewards } from './services/agingService';
 import { getTimeOfDay, shouldAutoSleep } from './services/timeService';
 import { getWeather } from './services/weatherService';
 import { getPersonality, applyPersonalityToTick, shouldIgnoreClick } from './services/personality';
@@ -26,10 +28,18 @@ import DailyReward from './components/DailyReward';
 import Scrapbook from './components/Scrapbook';
 import DesktopWidget from './components/DesktopWidget';
 import SpriteEditor from './components/SpriteEditor';
+import FoodMenu from './components/FoodMenu';
+import BirthdayEvent from './components/BirthdayEvent';
+import SoundSettings from './components/SoundSettings';
+import StatsDashboard from './components/StatsDashboard';
 import { getActiveCustomSpriteData, getActiveCustomSprite } from './services/customSpriteService';
 import { checkAchievements, getStats, incrementStat, recordGameWin } from './services/achievementService';
+import { getActiveHabitat, setActiveHabitat, getHabitatMoodBonus } from './services/habitatService';
+import Habitat from './components/Habitat';
+import HabitatSelector from './components/HabitatSelector';
 import { checkDailyReward } from './services/dailyRewards';
 import { recordFirstFeed, recordFirstPlay, recordFirstPet, recordLevelUp, recordSpeciesUnlock, recordAccessoryEquip, recordAchievement, recordStreak, recordGameWin as recordGameWinScrapbook } from './services/scrapbookService';
+import { recordInteraction as recordStatsInteraction, recordLevelUp as recordStatsLevelUp, recordEvolution as recordStatsEvolution, recordAchievementUnlock as recordStatsAchievement, recordGamePlayed as recordStatsGame, recordGameWin as recordStatsGameWin, startPlaytimeTracking, stopPlaytimeTracking } from './services/statsService';
 
 
 // Daily stats storage key
@@ -76,6 +86,14 @@ function App() {
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [showWidget, setShowWidget] = useState(false);
   const [showSpriteEditor, setShowSpriteEditor] = useState(false);
+  const [showFoodMenu, setShowFoodMenu] = useState(false);
+  const [showBirthday, setShowBirthday] = useState(false);
+  const [activeEffects, setActiveEffects] = useState(() => getActiveEffects());
+  const [feedMessage, setFeedMessage] = useState(null);
+  const [showSoundSettings, setShowSoundSettings] = useState(false);
+  const [showStatsDashboard, setShowStatsDashboard] = useState(false);
+  const [showHabitatSelector, setShowHabitatSelector] = useState(false);
+  const [activeHabitat, setActiveHabitatState] = useState(() => getActiveHabitat());
   const [activeCustomSpriteName, setActiveCustomSpriteName] = useState(() => getActiveCustomSprite());
   const [achievementPopup, setAchievementPopup] = useState(null);
   const [evolutionAnimation, setEvolutionAnimation] = useState(null);
@@ -269,6 +287,39 @@ function App() {
     }
   }, []);
 
+  // Initialize aging data on mount
+  useEffect(() => {
+    let agingData = getAgingData();
+    if (!agingData) {
+      agingData = initAgingData(petState.createdAt);
+    }
+  }, []);
+
+  // Check birthday on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (shouldCelebrateBirthday()) {
+        setShowBirthday(true);
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Tick active food effects every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const effects = tickEffects();
+      setActiveEffects(effects);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Start playtime tracking
+  useEffect(() => {
+    startPlaytimeTracking();
+    return () => stopPlaytimeTracking();
+  }, []);
+
   // Tick every 5 seconds (with personality modifiers)
   useEffect(() => {
     const interval = setInterval(() => {
@@ -276,6 +327,15 @@ function App() {
         let updated = tick(prev, idleSecondsRef.current);
         const personality = getPersonality(prev.species || 'slime');
         updated = applyPersonalityToTick(updated, personality);
+
+        // Apply habitat mood bonus
+        const habitatBonus = getHabitatMoodBonus(activeHabitat);
+        if (habitatBonus.happiness) {
+          updated.happiness = Math.min(100, updated.happiness + habitatBonus.happiness);
+        }
+        if (habitatBonus.energy) {
+          updated.energy = Math.min(100, updated.energy + habitatBonus.energy);
+        }
 
         // Track sleep minutes
         if (updated.state === 'sleeping') {
@@ -348,6 +408,7 @@ function App() {
         });
         setTriggerEmote({ type: 'heart', t: Date.now() });
         recordInteraction();
+        recordStatsInteraction('feed');
         dailyStatsRef.current.timesFed = (dailyStatsRef.current.timesFed || 0) + 1;
         saveDailyStats(dailyStatsRef.current);
         clearActionTimeout();
@@ -358,6 +419,10 @@ function App() {
         recordFirstFeed();
         break;
 
+      case 'food':
+        setShowFoodMenu(true);
+        break;
+
       case 'play':
         setPetState((prev) => {
           const updated = play(prev);
@@ -366,6 +431,7 @@ function App() {
         });
         setTriggerEmote({ type: 'music', t: Date.now() });
         recordInteraction();
+        recordStatsInteraction('play');
         dailyStatsRef.current.timesPlayed = (dailyStatsRef.current.timesPlayed || 0) + 1;
         saveDailyStats(dailyStatsRef.current);
         clearActionTimeout();
@@ -379,10 +445,19 @@ function App() {
       case 'sleep':
         setPetState((prev) => sleep(prev));
         setTriggerEmote({ type: 'zzz', t: Date.now() });
+        recordStatsInteraction('sleep');
         break;
 
       case 'stats':
         setShowStats((prev) => !prev);
+        break;
+
+      case 'sound':
+        setShowSoundSettings((prev) => !prev);
+        break;
+
+      case 'lifetimeStats':
+        setShowStatsDashboard((prev) => !prev);
         break;
 
       case 'widget':
@@ -409,6 +484,10 @@ function App() {
         setShowScrapbook((prev) => !prev);
         break;
 
+      case 'habitat':
+        setShowHabitatSelector((prev) => !prev);
+        break;
+
       case 'pets':
         setShowPetSlots((prev) => !prev);
         break;
@@ -432,6 +511,9 @@ function App() {
         // Handle game actions
         if (action && action.startsWith('game:')) {
           recordInteraction();
+          recordStatsInteraction('game');
+          const gameId = action.split(':')[1];
+          if (gameId) recordStatsGame(gameId);
           dailyStatsRef.current.gamesPlayed = (dailyStatsRef.current.gamesPlayed || 0) + 1;
           saveDailyStats(dailyStatsRef.current);
         }
@@ -523,6 +605,7 @@ function App() {
     });
     setTriggerEmote({ type: 'star', t: Date.now() });
     recordInteraction();
+    recordStatsInteraction('pet');
     dailyStatsRef.current.timesPetted = (dailyStatsRef.current.timesPetted || 0) + 1;
     saveDailyStats(dailyStatsRef.current);
     setJustPetted(true);
@@ -530,6 +613,51 @@ function App() {
     recordFirstPet();
     { const s = getStats(); runAchievementCheck(s); }
   }, [petState.species]);
+
+  // Handle food selection from FoodMenu
+  const handleFoodSelect = useCallback((foodId) => {
+    setShowFoodMenu(false);
+    setPetState((prev) => {
+      const updated = feed(prev, foodId);
+      checkLevelUp(prev, updated);
+      // Show feed message
+      if (updated._feedMessage) {
+        setFeedMessage(updated._feedMessage);
+        setTimeout(() => setFeedMessage(null), 3000);
+      }
+      // Clean up internal props
+      const { _feedEffect, _feedMessage, ...cleanState } = updated;
+      return cleanState;
+    });
+    setTriggerEmote({ type: 'heart', t: Date.now() });
+    recordInteraction();
+    recordStatsInteraction('feed');
+    dailyStatsRef.current.timesFed = (dailyStatsRef.current.timesFed || 0) + 1;
+    saveDailyStats(dailyStatsRef.current);
+    clearActionTimeout();
+    actionTimeoutRef.current = setTimeout(() => {
+      setPetState((prev) => ({ ...prev, state: 'idle' }));
+    }, 3000);
+    { const s = incrementStat('timesFed'); runAchievementCheck(s); }
+    recordFirstFeed();
+    // Update active effects display
+    setActiveEffects(getActiveEffects());
+  }, []);
+
+  // Handle birthday celebration
+  const handleBirthdayCelebrate = useCallback(() => {
+    const rewards = getBirthdayRewards();
+    markBirthdayCelebrated();
+    // Apply rewards
+    setPetState((prev) => {
+      const updated = { ...prev };
+      updated.xp = (updated.xp || 0) + rewards.xp;
+      updated.level = calculateLevel(updated.xp);
+      return updated;
+    });
+    // Add food reward to inventory
+    addToInventory(rewards.food, rewards.foodCount);
+  }, []);
 
   // Right-click context menu
   const handleContextMenu = useCallback((e) => {
@@ -597,6 +725,11 @@ function App() {
       style={{ background: 'transparent', width: '100vw', height: '100vh' }}
       onContextMenu={handleContextMenu}
     >
+      {/* Habitat background */}
+      <AnimatePresence mode="wait">
+        <Habitat key={activeHabitat} habitatId={activeHabitat} />
+      </AnimatePresence>
+
       {/* Weather overlay */}
       <WeatherOverlay weather={weather} />
 
@@ -685,6 +818,45 @@ function App() {
         )}
       </AnimatePresence>
 
+      {/* Food Menu */}
+      <AnimatePresence>
+        {showFoodMenu && (
+          <FoodMenu
+            petState={petState}
+            onSelectFood={handleFoodSelect}
+            onClose={() => setShowFoodMenu(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Feed message toast */}
+      <AnimatePresence>
+        {feedMessage && (
+          <motion.div
+            className="fixed top-8 left-1/2 -translate-x-1/2 z-[90] bg-gray-900/95 backdrop-blur-md text-white text-sm px-4 py-2 rounded-xl border border-gray-700/50 shadow-xl"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.2 }}
+          >
+            {feedMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Birthday Event */}
+      <AnimatePresence>
+        {showBirthday && (
+          <BirthdayEvent
+            petName={petState.name}
+            petAge={(() => { const d = getAgingData(); return d ? getPetAge(d.birthDate) : { days: 0 }; })()}
+            rewards={getBirthdayRewards()}
+            onCelebrate={handleBirthdayCelebrate}
+            onDismiss={() => setShowBirthday(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Stats panel */}
       <AnimatePresence>
         {showStats && (
@@ -754,6 +926,20 @@ function App() {
         )}
       </AnimatePresence>
 
+      {/* Sound Settings */}
+      <AnimatePresence>
+        {showSoundSettings && (
+          <SoundSettings onClose={() => setShowSoundSettings(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Stats Dashboard */}
+      <AnimatePresence>
+        {showStatsDashboard && (
+          <StatsDashboard onClose={() => setShowStatsDashboard(false)} />
+        )}
+      </AnimatePresence>
+
       {/* Pet Slots panel */}
       <AnimatePresence>
         {showPetSlots && (
@@ -766,6 +952,22 @@ function App() {
             onCreate={handleCreatePet}
             onDelete={handleDeletePet}
             onClose={() => setShowPetSlots(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Habitat Selector */}
+      <AnimatePresence>
+        {showHabitatSelector && (
+          <HabitatSelector
+            currentLevel={petState.level || 1}
+            activeHabitat={activeHabitat}
+            onSelect={(id) => {
+              setActiveHabitat(id);
+              setActiveHabitatState(id);
+              setShowHabitatSelector(false);
+            }}
+            onClose={() => setShowHabitatSelector(false)}
           />
         )}
       </AnimatePresence>

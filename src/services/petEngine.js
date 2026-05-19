@@ -7,6 +7,7 @@
 import { speciesConfig } from '../data/sprites';
 import { accessories } from '../data/accessories';
 import { checkEvolution, getEvolutionStage } from './evolutionService';
+import { useFood as useFoodItem, getFoodById } from './foodService';
 
 export function createDefaultPet() {
   const now = Date.now();
@@ -61,8 +62,18 @@ export function tick(petState, idleSeconds) {
 
 /**
  * Feed the pet: hunger +30, happiness +10, xp +5
+ * If foodId is provided, uses food-specific effects from foodService.
  */
-export function feed(petState) {
+export function feed(petState, foodId) {
+  // If a specific food is given, delegate to foodService
+  if (foodId) {
+    const { updatedPet, effect, message } = useFoodItem(foodId, petState);
+    updatedPet.mood = calculateMood(updatedPet);
+    updatedPet.level = calculateLevel(updatedPet.xp);
+    return { ...updatedPet, _feedEffect: effect, _feedMessage: message };
+  }
+
+  // Default feed (backward compatible - uses bread-like behavior)
   const updated = { ...petState };
   updated.hunger = Math.min(100, updated.hunger + 30);
   updated.happiness = Math.min(100, updated.happiness + 10);

@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import StatusBars from './StatusBars';
 import { speciesConfig } from '../data/sprites';
 import { getEvolutionStage, getNextEvolution, getEvolutionProgress } from '../services/evolutionService';
+import { getAgingData, getPetAge, getAgeStage, getAgeStageInfo } from '../services/agingService';
+import { getActiveEffects } from '../services/foodService';
 
 const moodEmojis = {
   happy: '😊',
@@ -163,6 +165,23 @@ function StatsPanel({ petState, onClose, onRename, onOpenPetSelector, onOpenAcce
 
       {/* Stats */}
       <div className="border-t border-gray-700/50 pt-2 space-y-1">
+        {(() => {
+          const agingData = getAgingData();
+          if (agingData) {
+            const age = getPetAge(agingData.birthDate);
+            const stage = getAgeStage(age.days);
+            const stageInfo = getAgeStageInfo(stage);
+            return (
+              <div className="flex justify-between text-xs text-gray-400">
+                <span>Age</span>
+                <span className={stageInfo.color}>
+                  {age.displayText} ({stageInfo.emoji} {stageInfo.label})
+                </span>
+              </div>
+            );
+          }
+          return null;
+        })()}
         <div className="flex justify-between text-xs text-gray-400">
           <span>Total Pets</span>
           <span>{stats.totalPets || 0}</span>
@@ -176,6 +195,25 @@ function StatsPanel({ petState, onClose, onRename, onOpenPetSelector, onOpenAcce
           <span>{stats.timesFed || 0}</span>
         </div>
       </div>
+
+      {/* Active Food Effects */}
+      {(() => {
+        const effects = getActiveEffects();
+        if (effects.length === 0) return null;
+        return (
+          <div className="border-t border-gray-700/50 pt-2 mt-2 space-y-1">
+            <span className="text-[10px] text-gray-500 uppercase tracking-wide">Active Effects</span>
+            {effects.map((eff, i) => (
+              <div key={i} className="flex justify-between text-xs text-gray-300">
+                <span>{eff.foodEmoji} {eff.type === 'xpMultiplier' ? '2x XP' : eff.type === 'speedBoost' ? 'Speed+' : 'Dance'}</span>
+                <span className="text-blue-400 font-mono text-[10px]">
+                  {Math.floor(eff.remainingSeconds / 60)}:{String(eff.remainingSeconds % 60).padStart(2, '0')}
+                </span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
     </motion.div>
   );
 }

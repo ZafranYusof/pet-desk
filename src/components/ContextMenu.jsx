@@ -8,7 +8,7 @@ const gameOptions = [
 ];
 
 const menuItems = [
-  { id: 'feed', icon: '🍖', label: 'Feed', disableCheck: (state) => state?.hunger > 90 },
+  { id: 'food', icon: '🍽️', label: 'Food', disableCheck: (state) => state?.hunger > 90 },
   { id: 'play', icon: '🎮', label: 'Play', disableCheck: (state) => state?.energy < 10 },
   { id: 'games', icon: '🕹️', label: 'Play Game', disableCheck: (state) => state?.energy < 10 },
   { id: 'sleep', icon: '😴', label: 'Sleep' },
@@ -18,7 +18,9 @@ const menuItems = [
   { id: 'diary', icon: '📖', label: 'Diary' },
   { id: 'achievements', icon: '🏆', label: 'Achievements' },
   { id: 'scrapbook', icon: '📸', label: 'Scrapbook' },
-  { id: 'stats', icon: '📊', label: 'Stats' },
+  { id: 'habitat', icon: '🏠', label: 'Habitat' },
+  { id: 'sound', icon: '🔊', label: 'Sound' },
+  { id: 'lifetimeStats', icon: '📈', label: 'Stats' },
   { id: 'rename', icon: '✏️', label: 'Rename' },
   { id: 'close', icon: '❌', label: 'Close' },
 ];
