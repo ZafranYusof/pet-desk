@@ -1,16 +1,11 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import PetSprite from './components/PetSprite';
-import StatusBars from './components/StatusBars';
+import Pet from './components/Pet';
 import StatsPanel from './components/StatsPanel';
 import ContextMenu from './components/ContextMenu';
-import Emotes, { useEmotes } from './components/Emotes';
 import LevelUp from './components/LevelUp';
-import Accessory from './components/Accessory';
 import PetSelector from './components/PetSelector';
 import AccessoryShop from './components/AccessoryShop';
-import { sprites, speciesConfig, speciesAccessoryOffsets } from './data/sprites';
-import { accessories } from './data/accessories';
 import { loadPet, loadPetAsync, savePet } from './services/petStorage';
 import { tick, feed, play, pet, sleep, calculateLevel, checkUnlocks, switchSpecies, equipAccessory, unequipAccessory } from './services/petEngine';
 import { getTimeOfDay, shouldAutoSleep } from './services/timeService';
@@ -29,36 +24,6 @@ import { checkAchievements, getStats, incrementStat, recordGameWin } from './ser
 import { checkDailyReward } from './services/dailyRewards';
 import { recordFirstFeed, recordFirstPlay, recordFirstPet, recordLevelUp, recordSpeciesUnlock, recordAccessoryEquip, recordAchievement, recordStreak, recordGameWin as recordGameWinScrapbook } from './services/scrapbookService';
 
-// Map pet state to sprite key based on species
-function getSpriteKey(petState, frameRef) {
-  const frame = frameRef % 2;
-  const prefix = petState.species || 'slime';
-  switch (petState.state) {
-    case 'sleeping':
-      return `${prefix}_sleep`;
-    case 'eating':
-      return `${prefix}_eat`;
-    case 'playing':
-    case 'dancing':
-      return frame === 0 ? `${prefix}_dance1` : `${prefix}_dance2`;
-    case 'walking':
-      return frame === 0 ? `${prefix}_walk1` : `${prefix}_walk2`;
-    default:
-      return frame === 0 ? `${prefix}_idle` : `${prefix}_idle2`;
-  }
-}
-
-// Map mood to sprite for static display
-function getMoodSprite(mood, species) {
-  const prefix = species || 'slime';
-  switch (mood) {
-    case 'happy': return `${prefix}_happy`;
-    case 'sad': return `${prefix}_sad`;
-    case 'sleepy': return `${prefix}_sleep`;
-    case 'hungry': return `${prefix}_sad`;
-    default: return `${prefix}_idle`;
-  }
-}
 
 // Daily stats storage key
 const DAILY_STATS_KEY = 'petdesk_daily_stats';
@@ -104,15 +69,25 @@ function App() {
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [achievementPopup, setAchievementPopup] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
-  const [currentSprite, setCurrentSprite] = useState('slime_idle');
   const [levelUpLevel, setLevelUpLevel] = useState(null);
   const [timeOfDay, setTimeOfDay] = useState(() => getTimeOfDay());
   const [weather, setWeather] = useState(() => getWeather());
+  const [screenSize, setScreenSize] = useState({ width: 1920, height: 1080 });
+
+  // Get screen size on mount
+  useEffect(() => {
+    if (window.electronAPI && window.electronAPI.getScreenSize) {
+      window.electronAPI.getScreenSize().then((size) => {
+        if (size) setScreenSize(size);
+      });
+    } else {
+      setScreenSize({ width: window.innerWidth, height: window.innerHeight });
+    }
+  }, []);
   const [justPetted, setJustPetted] = useState(false);
-  const { emoteQueue, addEmote } = useEmotes();
+  const [triggerEmote, setTriggerEmote] = useState(null);
   const idleSecondsRef = useRef(0);
   const actionTimeoutRef = useRef(null);
-  const frameRef = useRef(0);
   const dailyStatsRef = useRef(loadDailyStats());
   const notificationIntervalRef = useRef(null);
   const diaryCheckRef = useRef(null);
@@ -234,14 +209,6 @@ function App() {
     return () => clearInterval(checkMidnight);
   }, [petState]);
 
-  // Update sprite based on state (deterministic frame counter)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      frameRef.current += 1;
-      setCurrentSprite(getSpriteKey(petState, frameRef.current));
-    }, 800);
-    return () => clearInterval(interval);
-  }, [petState.state, petState.mood, petState.species]);
 
   // Listen for electron IPC events
   useEffect(() => {
@@ -271,7 +238,7 @@ function App() {
           checkLevelUp(prev, updated);
           return updated;
         });
-        addEmote('heart');
+        setTriggerEmote({ type: 'heart', t: Date.now() });
         recordInteraction();
         dailyStatsRef.current.timesFed = (dailyStatsRef.current.timesFed || 0) + 1;
         saveDailyStats(dailyStatsRef.current);
@@ -289,7 +256,7 @@ function App() {
           checkLevelUp(prev, updated);
           return updated;
         });
-        addEmote('music');
+        setTriggerEmote({ type: 'music', t: Date.now() });
         recordInteraction();
         dailyStatsRef.current.timesPlayed = (dailyStatsRef.current.timesPlayed || 0) + 1;
         saveDailyStats(dailyStatsRef.current);
@@ -303,7 +270,7 @@ function App() {
 
       case 'sleep':
         setPetState((prev) => sleep(prev));
-        addEmote('zzz');
+        setTriggerEmote({ type: 'zzz', t: Date.now() });
         break;
 
       case 'stats':
@@ -335,7 +302,7 @@ function App() {
         }
         break;
     }
-  }, [addEmote]);
+  }, []);
 
   function clearActionTimeout() {
     if (actionTimeoutRef.current) {
@@ -401,7 +368,7 @@ function App() {
 
     // Cat might ignore clicks
     if (shouldIgnoreClick(personality)) {
-      addEmote('sweat'); // "hmph" reaction
+      setTriggerEmote({ type: 'sweat', t: Date.now() }); // "hmph" reaction
       return;
     }
 
@@ -410,7 +377,7 @@ function App() {
       checkLevelUp(prev, updated);
       return updated;
     });
-    addEmote('star');
+    setTriggerEmote({ type: 'star', t: Date.now() });
     recordInteraction();
     dailyStatsRef.current.timesPetted = (dailyStatsRef.current.timesPetted || 0) + 1;
     saveDailyStats(dailyStatsRef.current);
@@ -418,7 +385,7 @@ function App() {
     setTimeout(() => setJustPetted(false), 2000);
     recordFirstPet();
     { const s = getStats(); runAchievementCheck(s); }
-  }, [addEmote, petState.species]);
+  }, [petState.species]);
 
   // Right-click context menu
   const handleContextMenu = useCallback((e) => {
@@ -426,18 +393,6 @@ function App() {
     setContextMenu({ x: e.clientX, y: e.clientY });
   }, []);
 
-  // Mouse enter/leave for click-through toggle
-  const handleMouseEnter = useCallback(() => {
-    if (window.electronAPI) {
-      window.electronAPI.setIgnoreMouse(false);
-    }
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    if (window.electronAPI) {
-      window.electronAPI.setIgnoreMouse(true);
-    }
-  }, []);
 
   const handleRename = useCallback((newName) => {
     setPetState((prev) => ({ ...prev, name: newName }));
@@ -458,55 +413,37 @@ function App() {
     setPetState((prev) => unequipAccessory(prev, accId));
   }, []);
 
-  const spriteData = sprites[currentSprite] || sprites.slime_idle;
-  const currentSpeciesOffsets = speciesAccessoryOffsets[petState.species || 'slime'] || speciesAccessoryOffsets.slime;
-
-  // Get equipped accessory objects
-  const equippedAccessoryObjects = (petState.accessories || [])
-    .map((id) => accessories.find((a) => a.id === id))
-    .filter(Boolean);
 
   return (
     <div
-      className="w-[200px] h-[200px] relative select-none overflow-hidden"
-      style={{ background: 'transparent' }}
+      className="w-full h-full relative select-none overflow-hidden"
+      style={{ background: 'transparent', width: '100vw', height: '100vh' }}
       onContextMenu={handleContextMenu}
     >
       {/* Weather overlay */}
       <WeatherOverlay weather={weather} />
 
-      {/* Pet sprite area */}
-      <div
-        className="absolute inset-0 flex items-center justify-center cursor-pointer"
-        onClick={handlePetClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
-        {/* Emotes floating above */}
-        <Emotes emoteQueue={emoteQueue} />
+      {/* Pet with full desktop roaming */}
+      <Pet
+        petState={petState.state || 'idle'}
+        species={petState.species || 'slime'}
+        onPet={handlePetClick}
+        onBounce={() => {}}
+        screenWidth={screenSize.width}
+        screenHeight={screenSize.height}
+        timeOfDay={timeOfDay}
+        weather={weather}
+        triggerEmote={triggerEmote}
+      />
 
-        {/* Particle effects */}
-        <Particles type="sparkles" active={petState.happiness > 80 && weather === 'sunny'} />
-        <Particles type="hearts" active={justPetted} />
-        <Particles type="raindrops" active={weather === 'rainy' || weather === 'stormy'} />
-        <Particles type="snow" active={weather === 'snowy'} />
-        <Particles type="fire" active={petState.hunger !== undefined && petState.hunger < 20} />
-        <Particles type="zzz" active={petState.state === 'sleeping'} />
-        <Particles type="music" active={petState.state === 'dancing'} />
-
-        {/* The pet with accessories */}
-        <div className="relative">
-          <PetSprite sprite={spriteData} scale={1.5} />
-          {equippedAccessoryObjects.map((acc) => (
-            <Accessory
-              key={acc.id}
-              accessory={acc}
-              speciesOffsets={currentSpeciesOffsets}
-              cellSize={4}
-            />
-          ))}
-        </div>
-      </div>
+      {/* Particle effects */}
+      <Particles type="sparkles" active={petState.happiness > 80 && weather === 'sunny'} />
+      <Particles type="hearts" active={justPetted} />
+      <Particles type="raindrops" active={weather === 'rainy' || weather === 'stormy'} />
+      <Particles type="snow" active={weather === 'snowy'} />
+      <Particles type="fire" active={petState.hunger !== undefined && petState.hunger < 20} />
+      <Particles type="zzz" active={petState.state === 'sleeping'} />
+      <Particles type="music" active={petState.state === 'dancing'} />
 
       {/* Context menu */}
       <AnimatePresence>

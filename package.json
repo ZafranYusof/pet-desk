@@ -8,7 +8,12 @@
     "build": "vite build",
     "build:exe": "vite build && electron-builder --win"
   },
-  "keywords": ["desktop-pet", "tamagotchi", "pixel-art", "electron"],
+  "keywords": [
+    "desktop-pet",
+    "tamagotchi",
+    "pixel-art",
+    "electron"
+  ],
   "author": "ZafranYusof",
   "license": "MIT",
   "dependencies": {
@@ -40,7 +45,14 @@
       "package.json"
     ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "build/icon.ico"
     },
     "nsis": {

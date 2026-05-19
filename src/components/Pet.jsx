@@ -5,15 +5,18 @@ import Emotes, { useEmotes } from './Emotes';
 import sprites from '../data/sprites';
 import { getPersonality } from '../services/personality';
 
-const ANIMATION_FRAMES = {
-  idle: ['slime_idle', 'slime_idle2'],
-  walking: ['slime_walk1', 'slime_walk2'],
-  sleeping: ['slime_sleep'],
-  eating: ['slime_eat'],
-  happy: ['slime_happy'],
-  dancing: ['slime_dance1', 'slime_dance2'],
-  sad: ['slime_sad'],
-};
+function getAnimationFrames(species = 'slime') {
+  const p = species;
+  return {
+    idle: [`${p}_idle`, `${p}_idle2`],
+    walking: [`${p}_walk1`, `${p}_walk2`],
+    sleeping: [`${p}_sleep`],
+    eating: [`${p}_eat`],
+    happy: [`${p}_happy`],
+    dancing: [`${p}_dance1`, `${p}_dance2`],
+    sad: [`${p}_sad`],
+  };
+}
 
 const FRAME_INTERVALS = {
   idle: 800,
@@ -30,7 +33,7 @@ const EDGE_PADDING = 50;
 const WALK_SPEED = 2; // px per frame at 60fps
 const GRAVITY_OFFSET = 150; // pet stays near bottom
 
-const Pet = ({ petState = 'idle', species = 'slime', onPet, onBounce, screenWidth = 1920, screenHeight = 1080, timeOfDay = 'afternoon', weather = 'sunny' }) => {
+const Pet = ({ petState = 'idle', species = 'slime', onPet, onBounce, screenWidth = 1920, screenHeight = 1080, timeOfDay = 'afternoon', weather = 'sunny', triggerEmote = null }) => {
   const [frameIndex, setFrameIndex] = useState(0);
   const [position, setPosition] = useState(() => ({
     x: Math.floor((screenWidth - PET_SIZE) / 2),
@@ -53,6 +56,7 @@ const Pet = ({ petState = 'idle', species = 'slime', onPet, onBounce, screenWidt
 
   // Determine current state (walking overrides idle)
   const currentState = isWalking ? 'walking' : petState;
+  const ANIMATION_FRAMES = getAnimationFrames(species);
   const frames = ANIMATION_FRAMES[currentState] || ANIMATION_FRAMES.idle;
   const interval = FRAME_INTERVALS[currentState] || 800;
 
@@ -240,6 +244,13 @@ const Pet = ({ petState = 'idle', species = 'slime', onPet, onBounce, screenWidt
       return () => clearInterval(timer);
     }
   }, [petState, addEmote]);
+
+  // External emote trigger from parent (feed/play/sleep actions)
+  useEffect(() => {
+    if (triggerEmote) {
+      addEmote(triggerEmote.type);
+    }
+  }, [triggerEmote, addEmote]);
 
   // Click to pet
   const handleClick = useCallback((e) => {
