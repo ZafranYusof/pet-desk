@@ -312,9 +312,17 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
     }
   }, [triggerEmote, addEmote]);
 
-  // Click to pet
+  // Click to pet with ripple effect
+  const [ripples, setRipples] = useState([]);
   const handleClick = useCallback((e) => {
     e.stopPropagation();
+    // Create ripple at click point
+    const rect = e.currentTarget.getBoundingClientRect();
+    const rippleX = e.clientX - rect.left - 20;
+    const rippleY = e.clientY - rect.top - 20;
+    const id = Date.now();
+    setRipples(prev => [...prev, { id, x: rippleX, y: rippleY }]);
+    setTimeout(() => setRipples(prev => prev.filter(r => r.id !== id)), 600);
     addEmote('heart');
     if (onPet) onPet();
   }, [addEmote, onPet]);
@@ -418,6 +426,14 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
           </div>
         )}
         <Emotes emoteQueue={emoteQueue} />
+        {/* Ripple effects */}
+        {ripples.map(ripple => (
+          <div
+            key={ripple.id}
+            className="pet-ripple"
+            style={{ left: ripple.x, top: ripple.y }}
+          />
+        ))}
         <motion.div
           animate={currentState}
           variants={bounceVariants}

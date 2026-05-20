@@ -16,3 +16,109 @@ html, body, #root {
   50% { transform: translateX(2px); }
   75% { transform: translateX(-1px); }
 }
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.5);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.7);
+}
+
+/* Global scrollbar for all overflow elements */
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.4);
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.6);
+}
+
+/* Pet interaction ripple */
+@keyframes ripple {
+  0% { transform: scale(0); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+.pet-ripple {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.4) 0%, transparent 70%);
+  animation: ripple 0.6s ease-out forwards;
+  pointer-events: none;
+}
+
+/* Food float animation */
+@keyframes floatUp {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-60px) scale(0.5); opacity: 0; }
+}
+.food-float {
+  position: absolute;
+  animation: floatUp 1s ease-out forwards;
+  pointer-events: none;
+  font-size: 24px;
+}
+
+/* Level up flash */
+@keyframes levelFlash {
+  0% { opacity: 0; }
+  20% { opacity: 0.3; }
+  100% { opacity: 0; }
+}
+.level-flash {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.3) 0%, transparent 70%);
+  animation: levelFlash 1s ease-out forwards;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* Achievement shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.achievement-shimmer {
+  background: linear-gradient(90deg, transparent 30%, rgba(251, 191, 36, 0.2) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+/* Particle burst */
+@keyframes particleBurst {
+  0% { transform: scale(0) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1.5) rotate(180deg); opacity: 0; }
+}
+.particle-burst {
+  animation: particleBurst 0.8s ease-out forwards;
+  pointer-events: none;
+}
+
+/* Loading shimmer for async content */
+@keyframes loadShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.loading-shimmer {
+  background: linear-gradient(90deg, rgba(55, 65, 81, 0.3) 25%, rgba(75, 85, 99, 0.5) 50%, rgba(55, 65, 81, 0.3) 75%);
+  background-size: 200% 100%;
+  animation: loadShimmer 1.5s infinite;
+  border-radius: 8px;
+}

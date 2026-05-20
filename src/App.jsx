@@ -11,7 +11,7 @@ import PetInteraction, { pickInteraction } from './components/PetInteraction';
 import { loadPet, loadPetAsync, savePet, loadAllPets, saveAllPets } from './services/petStorage';
 import { getPetSlots, savePetSlots, createNewPet, deletePet, summonCompanion, dismissCompanion, getCompanion, saveSlotState } from './services/multiPetService';
 import { tick, feed, play, pet, sleep, calculateLevel, checkUnlocks, checkEvolutionOnLevelUp, switchSpecies, equipAccessory, unequipAccessory } from './services/petEngine';
-import { tickEffects, getActiveEffects, hasActiveEffect, addToInventory } from './services/foodService';
+import { tickEffects, getActiveEffects, hasActiveEffect, addToInventory, getFoods } from './services/foodService';
 import { getAgingData, initAgingData, getPetAge, getAgeStage, getAgeStageInfo, getAgeMoodModifier, shouldCelebrateBirthday, markBirthdayCelebrated, getBirthdayRewards } from './services/agingService';
 import { getTimeOfDay, shouldAutoSleep } from './services/timeService';
 import { getWeather } from './services/weatherService';
@@ -293,6 +293,8 @@ function AppContent() {
 
   const [justPetted, setJustPetted] = useState(false);
   const [triggerEmote, setTriggerEmote] = useState(null);
+  const [foodFloats, setFoodFloats] = useState([]);
+  const [showLevelFlash, setShowLevelFlash] = useState(false);
   const idleSecondsRef = useRef(0);
   const actionTimeoutRef = useRef(null);
   const dailyStatsRef = useRef(loadDailyStats());
@@ -650,6 +652,8 @@ function AppContent() {
   function checkLevelUp(prev, updated) {
     if (updated.level > prev.level) {
       setLevelUpLevel(updated.level);
+      setShowLevelFlash(true);
+      setTimeout(() => setShowLevelFlash(false), 1000);
       notifyLevelUp(updated.level);
       submitScore('level', updated.level);
       submitScore('totalXp', updated.xp || 0);
@@ -716,6 +720,13 @@ function AppContent() {
 
   const handleFoodSelect = useCallback((foodId) => {
     setShowFoodMenu(false);
+    // Food float effect
+    const floatId = Date.now();
+    const foods = getFoods(petState?.level || 1);
+    const foodItem = foods?.find(f => f.id === foodId);
+    const emoji = foodItem?.emoji || '🍖';
+    setFoodFloats(prev => [...prev, { id: floatId, emoji }]);
+    setTimeout(() => setFoodFloats(prev => prev.filter(f => f.id !== floatId)), 1000);
     setPetState((prev) => {
       const updated = feed(prev, foodId);
       checkLevelUp(prev, updated);
@@ -1313,6 +1324,14 @@ function AppContent() {
       <AnimatePresence>
         {levelUpLevel && (<LevelUp level={levelUpLevel} onComplete={() => setLevelUpLevel(null)} />)}
       </AnimatePresence>
+
+      {/* Level up flash effect */}
+      {showLevelFlash && <div className="level-flash" />}
+
+      {/* Food float effects */}
+      {foodFloats.map(f => (
+        <div key={f.id} className="food-float" style={{ left: '50%', top: '50%' }}>{f.emoji}</div>
+      ))}
 
       {/* Evolution animation */}
       <AnimatePresence>

@@ -58,13 +58,21 @@ function PetStatsWidget({ petState }) {
   const energy = petState?.energy ?? 50;
   const happiness = petState?.happiness ?? 50;
 
-  const Bar = ({ value, color, label }) => (
+  function getBarColor(value) {
+    if (value > 70) return '#4ade80';
+    if (value > 40) return '#fbbf24';
+    return '#f87171';
+  }
+
+  const Bar = ({ value, label, icon }) => (
     <div className="flex items-center gap-1.5 w-full">
-      <span className="text-[9px] text-gray-400 w-3">{label}</span>
-      <div className="flex-1 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${value}%`, backgroundColor: color }}
+      <span className="text-[9px]">{icon}</span>
+      <div className="flex-1 h-1.5 bg-gray-700/60 rounded-full overflow-hidden">
+        <motion.div
+          className="h-full rounded-full"
+          style={{ backgroundColor: getBarColor(value) }}
+          animate={{ width: `${value}%` }}
+          transition={{ duration: 0.5 }}
         />
       </div>
     </div>
@@ -72,9 +80,9 @@ function PetStatsWidget({ petState }) {
 
   return (
     <div className="flex flex-col justify-center h-full gap-1.5 px-2">
-      <Bar value={hunger} color="#4ade80" label="H" />
-      <Bar value={energy} color="#60a5fa" label="E" />
-      <Bar value={happiness} color="#f472b6" label="♥" />
+      <Bar value={hunger} label="H" icon="🍖" />
+      <Bar value={energy} label="E" icon="⚡" />
+      <Bar value={happiness} label="♥" icon="💚" />
     </div>
   );
 }
@@ -186,7 +194,6 @@ function TimerWidget({ onTimerEnd }) {
       intervalRef.current = setInterval(() => {
         setTimer((prev) => {
           if (prev.remaining <= 1) {
-            // Timer ended
             const nextMode = prev.mode === 'work' ? 'break' : 'work';
             const nextDuration = nextMode === 'work' ? 25 * 60 : 5 * 60;
             const newState = { mode: nextMode, duration: nextDuration, remaining: nextDuration, isRunning: false, startedAt: null };
@@ -249,9 +256,34 @@ function TimerWidget({ onTimerEnd }) {
   );
 }
 
+// Mood Widget
+function MoodWidget({ petState }) {
+  const mood = petState?.mood || 'content';
+  const level = petState?.level || 1;
+  const moodEmojis = {
+    happy: '😊', content: '🙂', hungry: '😫',
+    tired: '😴', sad: '😢', excited: '🤩',
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-0.5">
+      <motion.div
+        className="text-2xl"
+        animate={{ scale: [1, 1.1, 1] }}
+        transition={{ duration: 2, repeat: Infinity }}
+      >
+        {moodEmojis[mood] || '🙂'}
+      </motion.div>
+      <div className="text-[9px] text-gray-300 capitalize">{mood}</div>
+      <div className="text-[8px] text-purple-400 font-medium">Lv.{level}</div>
+    </div>
+  );
+}
+
 // Main Desktop Widget
 function DesktopWidget({ petPosition, petState, visible, onTimerEnd }) {
   const [mode, setMode] = useState(() => getActiveWidget());
+  const [expanded, setExpanded] = useState(false);
 
   const handleCycleMode = (e) => {
     e.stopPropagation();
@@ -259,11 +291,15 @@ function DesktopWidget({ petPosition, petState, visible, onTimerEnd }) {
     setMode(next);
   };
 
+  const handleExpand = () => {
+    setExpanded(!expanded);
+  };
+
   if (!visible) return null;
 
   // Position widget above pet
   const widgetX = (petPosition?.x ?? 200) - 10;
-  const widgetY = (petPosition?.y ?? 200) - 90;
+  const widgetY = (petPosition?.y ?? 200) - (expanded ? 130 : 90);
 
   const modeIcons = {
     clock: '🕐',
@@ -271,6 +307,7 @@ function DesktopWidget({ petPosition, petState, visible, onTimerEnd }) {
     petStats: '📊',
     todo: '📝',
     timer: '⏱️',
+    mood: '😊',
   };
 
   return (
@@ -282,15 +319,29 @@ function DesktopWidget({ petPosition, petState, visible, onTimerEnd }) {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 10, scale: 0.9 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
+        drag
+        dragMomentum={false}
       >
-        <div className="w-[120px] h-[80px] bg-gray-900/80 backdrop-blur-md rounded-lg border border-gray-700/50 shadow-xl overflow-hidden flex flex-col">
+        <motion.div
+          className="bg-gray-900/80 backdrop-blur-xl rounded-xl border border-gray-600/30 shadow-2xl shadow-black/40 overflow-hidden flex flex-col"
+          animate={{ width: expanded ? 160 : 120, height: expanded ? 120 : 80 }}
+          transition={{ duration: 0.2 }}
+        >
           {/* Header - click to cycle */}
           <div
             className="flex items-center justify-between px-2 py-0.5 border-b border-gray-700/30 cursor-pointer hover:bg-gray-800/50 transition-colors"
             onClick={handleCycleMode}
           >
             <span className="text-[8px] text-gray-400">{modeIcons[mode]} {mode}</span>
-            <span className="text-[8px] text-gray-600">▶</span>
+            <div className="flex items-center gap-1">
+              <button
+                className="text-[8px] text-gray-600 hover:text-gray-300 transition-colors"
+                onClick={(e) => { e.stopPropagation(); handleExpand(); }}
+              >
+                {expanded ? '▼' : '▲'}
+              </button>
+              <span className="text-[8px] text-gray-600">▶</span>
+            </div>
           </div>
           {/* Content */}
           <div className="flex-1 min-h-0">
@@ -299,8 +350,9 @@ function DesktopWidget({ petPosition, petState, visible, onTimerEnd }) {
             {mode === 'petStats' && <PetStatsWidget petState={petState} />}
             {mode === 'todo' && <TodoWidget />}
             {mode === 'timer' && <TimerWidget onTimerEnd={onTimerEnd} />}
+            {mode === 'mood' && <MoodWidget petState={petState} />}
           </div>
-        </div>
+        </motion.div>
       </motion.div>
     </AnimatePresence>
   );
