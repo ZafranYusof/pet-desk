@@ -159,13 +159,20 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, onPet, onBounce,
   }, [isWalking, effectiveWalkSpeed]);
 
   // Schedule walking behavior: idle time modified by personality
+  const petStateRef = useRef(petState);
+  petStateRef.current = petState;
+  const pickNewDestRef = useRef(pickNewDestination);
+  pickNewDestRef.current = pickNewDestination;
+  const walkFreqRef = useRef(personality.walkFrequencyMultiplier || 1);
+  walkFreqRef.current = personality.walkFrequencyMultiplier || 1;
+
   useEffect(() => {
     const scheduleNextWalk = () => {
       const baseIdle = (Math.random() * 10 + 5) * 1000; // 5-15s
-      const idleTime = baseIdle / (personality.walkFrequencyMultiplier || 1);
+      const idleTime = baseIdle / walkFreqRef.current;
       idleTimerRef.current = setTimeout(() => {
-        if (petState === 'idle' || petState === 'happy') {
-          const dest = pickNewDestination();
+        if (petStateRef.current === 'idle' || petStateRef.current === 'happy') {
+          const dest = pickNewDestRef.current();
           targetRef.current = dest;
           setIsWalking(true);
         }
@@ -177,7 +184,7 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, onPet, onBounce,
     return () => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
-  }, [petState, pickNewDestination, personality.walkFrequencyMultiplier]);
+  }, []); // stable - uses refs for latest values
 
   // Stop walking when state changes to sleeping/eating/dancing
   useEffect(() => {
@@ -189,14 +196,23 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, onPet, onBounce,
   }, [petState]);
 
   // Occasional jump (frequency modified by personality bounciness)
+  const isWalkingRef = useRef(isWalking);
+  isWalkingRef.current = isWalking;
+  const onBounceRef = useRef(onBounce);
+  onBounceRef.current = onBounce;
+  const bounceFreqRef = useRef(personality.bounceFrequencyMultiplier || 1);
+  bounceFreqRef.current = personality.bounceFrequencyMultiplier || 1;
+  const bounceHeightRef = useRef(personality.bounceHeightMultiplier || 1);
+  bounceHeightRef.current = personality.bounceHeightMultiplier || 1;
+
   useEffect(() => {
     const scheduleJump = () => {
       const baseDelay = (Math.random() * 20 + 20) * 1000;
-      const delay = baseDelay / (personality.bounceFrequencyMultiplier || 1);
+      const delay = baseDelay / bounceFreqRef.current;
       const timer = setTimeout(() => {
-        if ((petState === 'idle' || petState === 'happy') && !isWalking) {
+        if ((petStateRef.current === 'idle' || petStateRef.current === 'happy') && !isWalkingRef.current) {
           setIsJumping(true);
-          if (onBounce) onBounce();
+          if (onBounceRef.current) onBounceRef.current();
           setTimeout(() => setIsJumping(false), 400);
         }
         scheduleJump();
@@ -206,7 +222,7 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, onPet, onBounce,
 
     const timer = scheduleJump();
     return () => clearTimeout(timer);
-  }, [petState, isWalking, onBounce, personality.bounceFrequencyMultiplier]);
+  }, []); // stable - uses refs
 
   // Ghost special: flicker (opacity 0.3 for 1s)
   useEffect(() => {

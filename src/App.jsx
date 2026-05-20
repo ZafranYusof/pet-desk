@@ -457,10 +457,15 @@ function AppContent() {
     else setPetSpriteClass('');
   }, [petState.state, petState.mood]);
 
-  // Screen edge awareness (Task 6)
+  // Screen edge awareness (Task 6) - debounced to avoid re-render spam
+  const edgeTimerRef = useRef(null);
   useEffect(() => {
-    const edge = detectEdge(primaryPosition, screenSize);
-    setEdgeReaction(edge);
+    if (edgeTimerRef.current) clearTimeout(edgeTimerRef.current);
+    edgeTimerRef.current = setTimeout(() => {
+      const edge = detectEdge(primaryPosition, screenSize);
+      setEdgeReaction(edge);
+    }, 300);
+    return () => { if (edgeTimerRef.current) clearTimeout(edgeTimerRef.current); };
   }, [primaryPosition, screenSize]);
 
   // Tick every 5 seconds (with personality modifiers + personality evolution)
@@ -849,6 +854,8 @@ function AppContent() {
     }
   }, []);
 
+  const noopBounce = useCallback(() => {}, []);
+
   // Get palette filter for pet sprite
   const paletteFilter = getPaletteFilter(colorPalette.id, colorPalette.customHue);
 
@@ -876,7 +883,7 @@ function AppContent() {
           species={petState.species || 'slime'}
           level={petState.level || 1}
           onPet={handlePetClick}
-          onBounce={() => {}}
+          onBounce={noopBounce}
           screenWidth={screenSize.width}
           screenHeight={screenSize.height}
           timeOfDay={timeOfDay}
@@ -900,7 +907,7 @@ function AppContent() {
           species={companionState.species || 'slime'}
           level={companionState.level || 1}
           onPet={() => {}}
-          onBounce={() => {}}
+          onBounce={noopBounce}
           screenWidth={screenSize.width}
           screenHeight={screenSize.height}
           timeOfDay={timeOfDay}
