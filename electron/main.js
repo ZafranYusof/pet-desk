@@ -140,7 +140,11 @@ ipcMain.handle('quit-app', () => {
 // Allow renderer to toggle mouse events (for interaction)
 ipcMain.on('set-ignore-mouse', (event, ignore) => {
   if (mainWindow) {
-    mainWindow.setIgnoreMouseEvents(ignore, { forward: true });
+    if (ignore) {
+      mainWindow.setIgnoreMouseEvents(true, { forward: true });
+    } else {
+      mainWindow.setIgnoreMouseEvents(false);
+    }
   }
 });
 
