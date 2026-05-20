@@ -1,13 +1,16 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 function AchievementPopup({ achievement, onDismiss }) {
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      onDismiss();
+      onDismissRef.current();
     }, 4000);
     return () => clearTimeout(timer);
-  }, [onDismiss]);
+  }, []);
 
   if (!achievement) return null;
 

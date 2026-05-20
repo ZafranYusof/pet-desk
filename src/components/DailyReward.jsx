@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { checkDailyReward, claimReward, getWeekStatus, getStreak } from '../services/dailyRewards';
+import { checkDailyReward, claimReward, dismissReward, getWeekStatus, getStreak } from '../services/dailyRewards';
 
 function DailyReward({ petState, onClaim, onClose }) {
   const [claimed, setClaimed] = useState(false);
@@ -118,7 +118,7 @@ function DailyReward({ petState, onClaim, onClose }) {
 
         {/* Close button */}
         <button
-          onClick={onClose}
+          onClick={() => { if (!claimed) dismissReward(); onClose(); }}
           className="text-[10px] text-gray-500 hover:text-gray-300 cursor-pointer"
         >
           {claimed ? 'Nice!' : 'Skip'}

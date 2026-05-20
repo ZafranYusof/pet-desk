@@ -179,6 +179,18 @@ export function claimReward(petState) {
 }
 
 /**
+ * Dismiss today's reward without claiming (skip).
+ * Prevents popup from showing again until tomorrow.
+ */
+export function dismissReward() {
+  const state = loadState();
+  const today = getToday();
+  state.lastClaimed = today;
+  // Don't add to loginDates (streak doesn't count)
+  saveState(state);
+}
+
+/**
  * Get last 7 days status for calendar strip
  */
 export function getWeekStatus() {
