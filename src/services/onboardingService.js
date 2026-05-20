@@ -4,6 +4,8 @@
  */
 
 const ONBOARDING_KEY = 'petdesk_onboarding';
+const VERSION_KEY = 'petdesk_onboarding_version';
+const CURRENT_VERSION = '0.8.0';
 
 const ONBOARDING_STEPS = [
   {
@@ -78,8 +80,18 @@ function saveOnboardingState(state) {
 
 /**
  * Check if onboarding should show.
+ * Resets on version upgrade.
  */
 export function shouldShowOnboarding() {
+  try {
+    const lastVersion = localStorage.getItem(VERSION_KEY);
+    if (lastVersion !== CURRENT_VERSION) {
+      // New version - reset onboarding
+      localStorage.removeItem(ONBOARDING_KEY);
+      localStorage.setItem(VERSION_KEY, CURRENT_VERSION);
+      return true;
+    }
+  } catch (e) { /* ignore */ }
   const state = loadOnboardingState();
   return !state.completed && !state.skipped;
 }
