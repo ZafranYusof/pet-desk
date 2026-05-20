@@ -5,6 +5,7 @@ import { speciesConfig } from '../data/sprites';
 import { getEvolutionStage, getNextEvolution, getEvolutionProgress } from '../services/evolutionService';
 import { getAgingData, getPetAge, getAgeStage, getAgeStageInfo } from '../services/agingService';
 import { getActiveEffects } from '../services/foodService';
+import { getCurrentActivity, getCategoryInfo } from '../services/activityMonitorService';
 
 const moodEmojis = {
   happy: '😊',
@@ -263,6 +264,34 @@ function StatsPanel({ petState, onClose, onRename, onOpenPetSelector, onOpenAcce
                   </span>
                 </div>
               ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Current Activity */}
+      {(() => {
+        const activity = getCurrentActivity();
+        if (!activity) return null;
+        const info = getCategoryInfo(activity.category);
+        return (
+          <div className="px-4 pb-3">
+            <div className="bg-emerald-900/20 rounded-xl p-2.5 border border-emerald-500/20">
+              <span className="text-[9px] text-emerald-400 uppercase tracking-wide font-medium">Current Activity</span>
+              <div className="flex items-center justify-between mt-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm">{info.icon}</span>
+                  <span className="text-[10px] text-gray-300">{info.label}</span>
+                </div>
+                <span className="text-[10px] text-emerald-400 font-mono">
+                  {activity.durationMinutes > 0 ? `${activity.durationMinutes}m` : '<1m'}
+                </span>
+              </div>
+              {activity.windowTitle && (
+                <div className="text-[9px] text-gray-500 mt-1 truncate" title={activity.windowTitle}>
+                  {activity.windowTitle.length > 30 ? activity.windowTitle.slice(0, 30) + '...' : activity.windowTitle}
+                </div>
+              )}
             </div>
           </div>
         );

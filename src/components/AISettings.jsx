@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { getAISettings, saveAISettings } from '../services/aiChatService';
+import { getActivitySettings, saveActivitySettings } from '../services/activityMonitorService';
 
 function AISettings({ onClose }) {
   const [settings, setSettings] = useState(() => getAISettings());
+  const [activitySettings, setActivitySettings] = useState(() => getActivitySettings());
   const [saved, setSaved] = useState(false);
 
   // Electron click-through handlers
@@ -16,6 +18,7 @@ function AISettings({ onClose }) {
 
   const handleSave = () => {
     saveAISettings(settings);
+    saveActivitySettings(activitySettings);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -104,6 +107,27 @@ function AISettings({ onClose }) {
             <motion.div
               className="w-4 h-4 bg-white rounded-full absolute top-0.5 shadow-sm"
               animate={{ left: settings.useAIForAutoChat ? '22px' : '2px' }}
+              transition={{ duration: 0.15 }}
+            />
+          </motion.button>
+        </div>
+
+        {/* Monitor Activity toggle */}
+        <div className="flex items-center justify-between py-2">
+          <div className="space-y-0.5">
+            <span className="text-xs text-gray-200 font-medium">Monitor Activity</span>
+            <p className="text-[10px] text-gray-500">Pet reacts to what you're doing on desktop</p>
+          </div>
+          <motion.button
+            className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ${
+              activitySettings.enabled ? 'bg-purple-600' : 'bg-gray-700'
+            }`}
+            onClick={() => setActivitySettings((prev) => ({ ...prev, enabled: !prev.enabled }))}
+            whileTap={{ scale: 0.95 }}
+          >
+            <motion.div
+              className="w-4 h-4 bg-white rounded-full absolute top-0.5 shadow-sm"
+              animate={{ left: activitySettings.enabled ? '22px' : '2px' }}
               transition={{ duration: 0.15 }}
             />
           </motion.button>

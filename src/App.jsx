@@ -113,7 +113,8 @@ import ImportExport from './components/ImportExport';
 import { getDecorationBonuses } from './services/decorationService';
 import AIChatPanel from './components/AIChatPanel';
 import AISettings from './components/AISettings';
-import { getAISettings, generateIdleChat } from './services/aiChatService';
+import { getAISettings, generateIdleChat, generateActivityComment } from './services/aiChatService';
+import { initActivityMonitor, getCurrentActivity, onActivityChange, isActivityMonitorEnabled, isUserIdle } from './services/activityMonitorService';
 
 // Daily stats storage key
 const DAILY_STATS_KEY = 'petdesk_daily_stats';
@@ -222,6 +223,11 @@ function AppContent() {
     try { return localStorage.getItem('petdesk_mini_pet_visible') === 'true'; } catch { return false; }
   });
   const [currentMood, setCurrentMood] = useState(() => getMoodState().currentMood);
+
+  // Activity monitoring state
+  const [currentActivityState, setCurrentActivityState] = useState(null);
+  const lastActivityCommentRef = useRef(0);
+  const ACTIVITY_COMMENT_COOLDOWN = 3 * 60 * 1000; // 3 minutes between activity comments
 
   // Multi-pet state
   const [petSlots, setPetSlots] = useState(() => getPetSlots());
@@ -430,7 +436,15 @@ function AppContent() {
               happiness: petState.happiness || 50,
               energy: petState.energy || 50,
             };
-            const msg = await generateIdleChat(petContext);
+            // Pass activity context to idle chat if available
+            const activity = getCurrentActivity();
+            const activityCtx = activity ? {
+              processName: activity.processName,
+              windowTitle: activity.windowTitle,
+              category: activity.category,
+              durationMinutes: activity.durationMinutes || 0,
+            } : undefined;
+            const msg = await generateIdleChat(petContext, activityCtx);
             if (msg) { setChatBubble(msg); saveChatMessage(msg); }
           } catch (e) {
             const msg = getIdleChat(petState);
@@ -686,6 +700,93 @@ function AppContent() {
       }
     });
   }, []);
+
+  // Activity Monitor: initialize and listen for activity changes
+  useEffect(() => {
+    initActivityMonitor();
+
+    const unsubscribe = onActivityChange(async (activity) => {
+      if (!isActivityMonitorEnabled()) return;
+      setCurrentActivityState(activity);
+
+      // Throttle: minimum 3 minutes between activity comments
+      const now = Date.now();
+      if (now - lastActivityCommentRef.current < ACTIVITY_COMMENT_COOLDOWN) return;
+
+      // 30% chance pet comments on activity change
+      if (Math.random() > 0.3) return;
+
+      lastActivityCommentRef.current = now;
+
+      const petContext = {
+        species: petState.species || 'slime',
+        name: petState.name || 'Pet',
+        level: petState.level || 1,
+        mood: petState.happiness > 70 ? 'happy' : petState.happiness < 30 ? 'sad' : 'neutral',
+        happiness: petState.happiness || 50,
+        energy: petState.energy || 50,
+      };
+
+      const activityCtx = {
+        ...activity,
+        durationMinutes: 0,
+      };
+
+      try {
+        const comment = await generateActivityComment(activityCtx, petContext);
+        if (comment) {
+          setChatBubble(comment);
+          saveChatMessage(comment);
+        }
+      } catch (e) {
+        // Silently ignore
+      }
+    });
+
+    return () => unsubscribe();
+  }, [petState.species, petState.happiness, petState.energy]);
+
+  // Activity Monitor: idle detection (10+ minutes same window)
+  useEffect(() => {
+    if (!isActivityMonitorEnabled()) return;
+
+    const idleCheckInterval = setInterval(async () => {
+      if (isUserIdle()) {
+        const now = Date.now();
+        if (now - lastActivityCommentRef.current < ACTIVITY_COMMENT_COOLDOWN) return;
+        lastActivityCommentRef.current = now;
+
+        const petContext = {
+          species: petState.species || 'slime',
+          name: petState.name || 'Pet',
+          level: petState.level || 1,
+          mood: petState.happiness > 70 ? 'happy' : petState.happiness < 30 ? 'sad' : 'neutral',
+          happiness: petState.happiness || 50,
+          energy: petState.energy || 50,
+        };
+
+        const activity = getCurrentActivity();
+        const activityCtx = {
+          processName: activity?.processName || 'unknown',
+          windowTitle: activity?.windowTitle || '',
+          category: 'idle',
+          durationMinutes: activity?.durationMinutes || 10,
+        };
+
+        try {
+          const comment = await generateActivityComment(activityCtx, petContext);
+          if (comment) {
+            setChatBubble(comment);
+            saveChatMessage(comment);
+          }
+        } catch (e) {
+          // Silently ignore
+        }
+      }
+    }, 60000); // Check every minute
+
+    return () => clearInterval(idleCheckInterval);
+  }, [petState.species, petState.happiness, petState.energy]);
 
   // Start ambient music based on habitat
   useEffect(() => {

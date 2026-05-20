@@ -17,6 +17,9 @@ let sessionStartTime = Date.now();
 let activityCheckInterval = null;
 let clipboardCheckInterval = null;
 let lastClipboardText = '';
+let activeWindowInterval = null;
+let lastActiveWindowTitle = '';
+let lastActiveWindowProcess = '';
 
 const isDev = !app.isPackaged;
 
@@ -167,17 +170,6 @@ function startActivityDetection() {
   activityCheckInterval = setInterval(() => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
 
-    // Check active window title using BrowserWindow focus as proxy
-    try {
-      const allWindows = BrowserWindow.getAllWindows();
-      const focused = BrowserWindow.getFocusedWindow();
-      const title = focused ? focused.getTitle() : '';
-      if (title && title !== lastActiveWindow) {
-        lastActiveWindow = title;
-        mainWindow.webContents.send('active-window-change', { title, name: title });
-      }
-    } catch (e) {}
-
     // Check for long session (2 hours)
     const sessionDuration = Date.now() - sessionStartTime;
     if (sessionDuration > 7200000) { // 2 hours
@@ -185,6 +177,61 @@ function startActivityDetection() {
       sessionStartTime = Date.now(); // Reset so it doesn't spam
     }
   }, 30000); // Check every 30 seconds
+}
+
+// Active window detection using PowerShell (real foreground window)
+function startActiveWindowDetection() {
+  const { execSync } = require('child_process');
+
+  activeWindowInterval = setInterval(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+
+    try {
+      const psScript = `
+Add-Type @"
+  using System;
+  using System.Runtime.InteropServices;
+  public class ForegroundWindow {
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int count);
+  }
+"@
+$hwnd = [ForegroundWindow]::GetForegroundWindow()
+$pid = 0
+[ForegroundWindow]::GetWindowThreadProcessId($hwnd, [ref]$pid) | Out-Null
+$sb = New-Object System.Text.StringBuilder 256
+[ForegroundWindow]::GetWindowText($hwnd, $sb, 256) | Out-Null
+$proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+@{ processName = $proc.ProcessName; windowTitle = $sb.ToString() } | ConvertTo-Json -Compress
+`;
+      const result = execSync(`powershell -NoProfile -NonInteractive -Command "${psScript.replace(/"/g, '\"').replace(/\n/g, ' ')}"`, {
+        encoding: 'utf8',
+        timeout: 5000,
+        windowsHide: true,
+      }).trim();
+
+      if (result) {
+        const parsed = JSON.parse(result);
+        const processName = parsed.processName || '';
+        const windowTitle = parsed.windowTitle || '';
+
+        // Only send when window actually changes
+        if (processName !== lastActiveWindowProcess || windowTitle !== lastActiveWindowTitle) {
+          lastActiveWindowProcess = processName;
+          lastActiveWindowTitle = windowTitle;
+          mainWindow.webContents.send('active-window', { processName, windowTitle });
+          // Also send to existing active-window-change for backward compat
+          mainWindow.webContents.send('active-window-change', { title: windowTitle, name: processName });
+        }
+      }
+    } catch (e) {
+      // Silently ignore errors (timeout, parse failures, etc.)
+    }
+  }, 10000); // Every 10 seconds
 }
 
 function startClipboardMonitoring() {
@@ -224,6 +271,9 @@ app.whenReady().then(() => {
   // Start activity detection
   startActivityDetection();
 
+  // Start active window detection (PowerShell-based)
+  startActiveWindowDetection();
+
   // Start clipboard monitoring
   startClipboardMonitoring();
 });
@@ -240,6 +290,7 @@ app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   if (idleCheckInterval) clearInterval(idleCheckInterval);
   if (activityCheckInterval) clearInterval(activityCheckInterval);
+  if (activeWindowInterval) clearInterval(activeWindowInterval);
   if (clipboardCheckInterval) clearInterval(clipboardCheckInterval);
 });
 
