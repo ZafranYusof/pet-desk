@@ -17,9 +17,56 @@ const MAX_CONTEXT_MESSAGES = 10;
 const DEFAULT_SETTINGS = {
   baseUrl: 'https://ollama.com/api',
   model: 'gpt-oss:120b',
-  apiKey: '',
+  apiKey: '1ccbc34c67e74dd9bd479106251a40dd.NN44WxcHQxfFSt1xH6WZ3AER',
   useAIForAutoChat: true,
 };
+
+/**
+ * Universal AI fetch — supports both Ollama native (/api/chat) and OpenAI (/v1/chat/completions).
+ */
+async function aiChatFetch(settings, messages, maxTokens = 60, temperature = 0.85) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (settings.apiKey) {
+    headers['Authorization'] = `Bearer ${settings.apiKey}`;
+  }
+
+  // Detect if Ollama native endpoint
+  const isOllama = settings.baseUrl.includes('ollama');
+  const url = isOllama
+    ? `${settings.baseUrl}/chat`
+    : `${settings.baseUrl}/v1/chat/completions`;
+
+  const body = isOllama
+    ? { model: settings.model, messages, stream: false }
+    : { model: settings.model, messages, max_tokens: maxTokens, temperature };
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (response.ok) {
+      const data = await response.json();
+      // Ollama native format: data.message.content
+      // OpenAI format: data.choices[0].message.content
+      const reply = isOllama
+        ? data.message?.content?.trim()
+        : data.choices?.[0]?.message?.content?.trim();
+      return reply || null;
+    }
+    return null;
+  } catch (e) {
+    clearTimeout(timeout);
+    throw e;
+  }
+}
 
 const FALLBACK_RESPONSES = [
   "*wiggles happily*",
@@ -188,34 +235,7 @@ export async function sendMessage(userMsg, petContext, activityContext) {
   ];
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
-    const headers = { 'Content-Type': 'application/json' };
-    if (settings.apiKey) {
-      headers['Authorization'] = `Bearer ${settings.apiKey}`;
-    }
-
-    const response = await fetch(`${settings.baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        model: settings.model,
-        messages,
-        max_tokens: 60,
-        temperature: 0.8,
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content?.trim();
+    const reply = await aiChatFetch(settings, messages, 60, 0.8);
 
     if (reply) {
       addToConversation('assistant', reply);
@@ -263,35 +283,7 @@ export async function generateIdleChat(petContext, activityContext) {
   ];
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
-    const headers = { 'Content-Type': 'application/json' };
-    if (settings.apiKey) {
-      headers['Authorization'] = `Bearer ${settings.apiKey}`;
-    }
-
-    const response = await fetch(`${settings.baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        model: settings.model,
-        messages,
-        max_tokens: 50,
-        temperature: 0.9,
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content?.trim();
-
+    const reply = await aiChatFetch(settings, messages, 50, 0.9);
     if (reply) return reply;
     return getFallbackResponse();
   } catch (e) {
@@ -396,33 +388,10 @@ export async function generateActivityComment(activity, petContext) {
         { role: 'user', content: userPrompt },
       ];
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
-
-      const headers = { 'Content-Type': 'application/json' };
-      if (settings.apiKey) {
-        headers['Authorization'] = `Bearer ${settings.apiKey}`;
-      }
-
-      const response = await fetch(`${settings.baseUrl}/v1/chat/completions`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          model: settings.model,
-          messages,
-          max_tokens: 40,
-          temperature: 0.85,
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (response.ok) {
-        const data = await response.json();
+      const reply = await aiChatFetch(settings, messages, 40, 0.85);
+      if (reply) {
         console.log('[PetDesk AI] Activity comment generated successfully');
-        const reply = data.choices?.[0]?.message?.content?.trim();
-        if (reply) return reply;
+        return reply;
       }
     } catch (e) {
       console.log('[PetDesk AI] Activity comment failed:', e.message);
