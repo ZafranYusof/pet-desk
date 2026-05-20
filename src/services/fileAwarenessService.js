@@ -8,6 +8,7 @@ const FILE_AWARENESS_KEY = 'petdesk-file-awareness';
 const SCAN_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
 let scanTimer = null;
+let initialScanTimeout = null;
 let lastScanTime = 0;
 
 /**
@@ -151,8 +152,10 @@ export async function performScan() {
  */
 export function startFileAwareness() {
   // Initial scan after 5 seconds (let app settle)
-  setTimeout(() => {
+  if (initialScanTimeout) clearTimeout(initialScanTimeout);
+  initialScanTimeout = setTimeout(() => {
     performScan();
+    initialScanTimeout = null;
   }, 5000);
 
   // Periodic scan every 30 minutes
@@ -166,6 +169,10 @@ export function startFileAwareness() {
  * Stop periodic scanning.
  */
 export function stopFileAwareness() {
+  if (initialScanTimeout) {
+    clearTimeout(initialScanTimeout);
+    initialScanTimeout = null;
+  }
   if (scanTimer) {
     clearInterval(scanTimer);
     scanTimer = null;
