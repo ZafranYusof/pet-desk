@@ -17,6 +17,8 @@ function QuickTap({ onGameEnd }) {
   const targetsShownRef = useRef(0);
   const timeoutRef = useRef(null);
   const gameActiveRef = useRef(true);
+  const onGameEndRef = useRef(onGameEnd);
+  onGameEndRef.current = onGameEnd;
 
   useEffect(() => { scoreRef.current = score; }, [score]);
   useEffect(() => { livesRef.current = lives; }, [lives]);
@@ -27,8 +29,8 @@ function QuickTap({ onGameEnd }) {
     setGameActive(false);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     const xp = scoreRef.current * 3;
-    onGameEnd(scoreRef.current, Math.max(0, xp));
-  }, [onGameEnd]);
+    onGameEndRef.current(scoreRef.current, Math.max(0, xp));
+  }, []);
 
   const getTimeout = useCallback(() => {
     // Starts at 1500ms, decreases by 50ms per hit, min 600ms

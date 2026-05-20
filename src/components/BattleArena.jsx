@@ -266,6 +266,11 @@ function BattleArena({ petState, onClose, onBattleEnd }) {
     }, 500);
   }, [battleState, isAnimating]);
 
+  const onBattleEndRef = useRef(onBattleEnd);
+  onBattleEndRef.current = onBattleEnd;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   const handleBattleEnd = useCallback((action) => {
     if (!battleState) return;
 
@@ -275,10 +280,10 @@ function BattleArena({ petState, onClose, onBattleEnd }) {
       newState.log.push({ actor: 'system', text: `A wild ${newState.opponent.name} appeared!` });
       setBattleState(newState);
     } else {
-      onBattleEnd(battleState.result, battleState.opponent?.level);
-      onClose();
+      onBattleEndRef.current(battleState.result, battleState.opponent?.level);
+      onCloseRef.current();
     }
-  }, [battleState, petState, onClose, onBattleEnd]);
+  }, [battleState, petState]);
 
   if (!battleState) return null;
 

@@ -24,6 +24,8 @@ function CatchFood({ onGameEnd }) {
   const petXRef = useRef(PLAY_WIDTH / 2 - PET_SIZE / 2);
   const foodsRef = useRef([]);
   const foodIdRef = useRef(0);
+  const onGameEndRef = useRef(onGameEnd);
+  onGameEndRef.current = onGameEnd;
 
   // Keep refs in sync
   useEffect(() => { scoreRef.current = score; }, [score]);
@@ -81,7 +83,7 @@ function CatchFood({ onGameEnd }) {
   useEffect(() => {
     if (!gameActive) {
       const xp = scoreRef.current * 2;
-      onGameEnd(scoreRef.current, Math.max(0, xp));
+      onGameEndRef.current(scoreRef.current, Math.max(0, xp));
     }
   }, [gameActive]);
 

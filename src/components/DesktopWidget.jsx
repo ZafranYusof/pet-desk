@@ -188,6 +188,8 @@ function TodoWidget() {
 function TimerWidget({ onTimerEnd }) {
   const [timer, setTimer] = useState(() => getTimerState());
   const intervalRef = useRef(null);
+  const onTimerEndRef = useRef(onTimerEnd);
+  onTimerEndRef.current = onTimerEnd;
 
   useEffect(() => {
     if (timer.isRunning) {
@@ -198,7 +200,7 @@ function TimerWidget({ onTimerEnd }) {
             const nextDuration = nextMode === 'work' ? 25 * 60 : 5 * 60;
             const newState = { mode: nextMode, duration: nextDuration, remaining: nextDuration, isRunning: false, startedAt: null };
             saveTimerState(newState);
-            if (onTimerEnd) onTimerEnd();
+            if (onTimerEndRef.current) onTimerEndRef.current();
             return newState;
           }
           const newState = { ...prev, remaining: prev.remaining - 1 };
@@ -208,7 +210,7 @@ function TimerWidget({ onTimerEnd }) {
       }, 1000);
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [timer.isRunning, onTimerEnd]);
+  }, [timer.isRunning]);
 
   const toggleTimer = (e) => {
     e.stopPropagation();

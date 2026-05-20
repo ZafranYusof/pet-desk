@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CatchFood from '../games/CatchFood';
 import MemoryMatch from '../games/MemoryMatch';
@@ -14,6 +14,10 @@ function MiniGame({ gameId, onClose, onComplete }) {
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [xpEarned, setXpEarned] = useState(0);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   const game = games[gameId];
   if (!game) return null;
@@ -24,11 +28,11 @@ function MiniGame({ gameId, onClose, onComplete }) {
     setScore(finalScore);
     setXpEarned(xp);
     setGameOver(true);
-    onComplete(xp);
+    onCompleteRef.current(xp);
 
     // Auto-close after 3 seconds
     setTimeout(() => {
-      onClose();
+      onCloseRef.current();
     }, 3000);
   };
 

@@ -16,6 +16,8 @@ function PomodoroMode({ onClose, onSessionComplete }) {
   const [breakMin, setBreakMin] = useState(settings.breakMinutes);
   const [showConfetti, setShowConfetti] = useState(false);
   const tickRef = useRef(null);
+  const onSessionCompleteRef = useRef(onSessionComplete);
+  onSessionCompleteRef.current = onSessionComplete;
 
   useEffect(() => {
     tickRef.current = setInterval(() => {
@@ -29,7 +31,7 @@ function PomodoroMode({ onClose, onSessionComplete }) {
         setStats(getPomodoroStats());
         setShowConfetti(true);
         setTimeout(() => setShowConfetti(false), 2000);
-        if (onSessionComplete) onSessionComplete(15);
+        if (onSessionCompleteRef.current) onSessionCompleteRef.current(15);
         setTimeout(() => setMessage(null), 4000);
       } else if (event === 'break_complete') {
         playSound('bounce');

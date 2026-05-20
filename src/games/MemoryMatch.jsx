@@ -29,6 +29,8 @@ function MemoryMatch({ onGameEnd }) {
   const [pairsFound, setPairsFound] = useState(0);
   const [locked, setLocked] = useState(false);
   const startTimeRef = useRef(Date.now());
+  const onGameEndRef = useRef(onGameEnd);
+  onGameEndRef.current = onGameEnd;
 
   // Check for match when 2 cards flipped
   useEffect(() => {
@@ -68,7 +70,7 @@ function MemoryMatch({ onGameEnd }) {
     if (pairsFound === EMOJIS.length) {
       const xp = Math.max(5, 20 - moves);
       setTimeout(() => {
-        onGameEnd(moves, xp);
+        onGameEndRef.current(moves, xp);
       }, 500);
     }
   }, [pairsFound]);

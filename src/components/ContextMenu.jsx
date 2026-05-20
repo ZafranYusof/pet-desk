@@ -87,6 +87,8 @@ function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
   const menuRef = useRef(null);
   const [showGames, setShowGames] = useState(false);
   const [tooltip, setTooltip] = useState(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   // Disable click-through when mouse is over context menu
   const handleMouseEnter = () => {
@@ -99,12 +101,12 @@ function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
   useEffect(() => {
     function handleClickOutside(e) {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
-        onClose();
+        onCloseRef.current();
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
+  }, []);
 
   // Adjust position to stay on screen
   const [adjustedPos, setAdjustedPos] = useState({ x, y });

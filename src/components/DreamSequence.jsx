@@ -10,6 +10,10 @@ function DreamSequence({ onComplete, onMoodEffect }) {
   const [frameIndex, setFrameIndex] = useState(0);
   const [showTitle, setShowTitle] = useState(true);
   const timerRef = useRef(null);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+  const onMoodEffectRef = useRef(onMoodEffect);
+  onMoodEffectRef.current = onMoodEffect;
 
   useEffect(() => {
     const d = getRandomDream();
@@ -35,8 +39,8 @@ function DreamSequence({ onComplete, onMoodEffect }) {
           // Dream complete - apply mood effect and close
           setTimeout(() => {
             const effect = getDreamMoodEffect(dream);
-            if (onMoodEffect) onMoodEffect(effect);
-            if (onComplete) onComplete();
+            if (onMoodEffectRef.current) onMoodEffectRef.current(effect);
+            if (onCompleteRef.current) onCompleteRef.current();
           }, 2000);
           return prev;
         }
@@ -146,8 +150,8 @@ function DreamSequence({ onComplete, onMoodEffect }) {
           onClick={() => {
             if (timerRef.current) clearInterval(timerRef.current);
             const effect = getDreamMoodEffect(dream);
-            if (onMoodEffect) onMoodEffect(effect);
-            if (onComplete) onComplete();
+            if (onMoodEffectRef.current) onMoodEffectRef.current(effect);
+            if (onCompleteRef.current) onCompleteRef.current();
           }}
         >
           Skip Dream →

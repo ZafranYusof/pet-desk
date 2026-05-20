@@ -394,13 +394,20 @@ function AppContent() {
   }, []);
 
   // Mood system tick every 5 seconds
+  const petStateRef = useRef(petState);
+  petStateRef.current = petState;
+  const weatherRef = useRef(weather);
+  weatherRef.current = weather;
+  const timeOfDayRef = useRef(timeOfDay);
+  timeOfDayRef.current = timeOfDay;
+
   useEffect(() => {
     const interval = setInterval(() => {
-      const moodState = tickMood(petState, weather, timeOfDay);
+      const moodState = tickMood(petStateRef.current, weatherRef.current, timeOfDayRef.current);
       setCurrentMood(moodState.currentMood);
     }, 5000);
     return () => clearInterval(interval);
-  }, [weather, timeOfDay]);
+  }, []);
 
   // Check for weather events every 30 minutes
   useEffect(() => {
@@ -426,15 +433,16 @@ function AppContent() {
       const delay = 120000 + Math.random() * 180000;
       chatTimerRef.current = setTimeout(async () => {
         const aiSettings = getAISettings();
+        const currentPetState = petStateRef.current;
         if (aiSettings.useAIForAutoChat) {
           try {
             const petContext = {
-              species: petState.species || 'slime',
-              name: petState.name || 'Pet',
-              level: petState.level || 1,
-              mood: petState.happiness > 70 ? 'happy' : petState.happiness < 30 ? 'sad' : 'neutral',
-              happiness: petState.happiness || 50,
-              energy: petState.energy || 50,
+              species: currentPetState.species || 'slime',
+              name: currentPetState.name || 'Pet',
+              level: currentPetState.level || 1,
+              mood: currentPetState.happiness > 70 ? 'happy' : currentPetState.happiness < 30 ? 'sad' : 'neutral',
+              happiness: currentPetState.happiness || 50,
+              energy: currentPetState.energy || 50,
             };
             // Pass activity context to idle chat if available
             const activity = getCurrentActivity();
@@ -447,11 +455,11 @@ function AppContent() {
             const msg = await generateIdleChat(petContext, activityCtx);
             if (msg) { setChatBubble(msg); saveChatMessage(msg); }
           } catch (e) {
-            const msg = getIdleChat(petState);
+            const msg = getIdleChat(currentPetState);
             if (msg) { setChatBubble(msg); saveChatMessage(msg); }
           }
         } else {
-          const msg = getIdleChat(petState);
+          const msg = getIdleChat(currentPetState);
           if (msg) { setChatBubble(msg); saveChatMessage(msg); }
         }
         scheduleChatMessage();
@@ -459,7 +467,7 @@ function AppContent() {
     }
     scheduleChatMessage();
     return () => { if (chatTimerRef.current) clearTimeout(chatTimerRef.current); };
-  }, [petState.species, petState.happiness]);
+  }, []);
 
   // Chat greeting on mount
   useEffect(() => {
@@ -581,9 +589,9 @@ function AppContent() {
 
   // Notification check every 60 seconds
   useEffect(() => {
-    notificationIntervalRef.current = setInterval(() => { checkAndNotify(petState); }, 60000);
+    notificationIntervalRef.current = setInterval(() => { checkAndNotify(petStateRef.current); }, 60000);
     return () => { if (notificationIntervalRef.current) clearInterval(notificationIntervalRef.current); };
-  }, [petState]);
+  }, []);
 
   // Diary: generate entry at midnight
   useEffect(() => {
@@ -591,16 +599,16 @@ function AppContent() {
       const today = new Date().toISOString().split('T')[0];
       if (dailyStatsRef.current.date !== today) {
         if (!hasEntryToday()) {
-          const entry = generateEntry(petState, dailyStatsRef.current);
+          const entry = generateEntry(petStateRef.current, dailyStatsRef.current);
           saveDiaryEntry(entry);
         }
         dailyStatsRef.current = getDefaultDailyStats();
-        dailyStatsRef.current.previousLevel = petState.level;
+        dailyStatsRef.current.previousLevel = petStateRef.current.level;
         saveDailyStats(dailyStatsRef.current);
       }
     }, 60000);
     return () => clearInterval(checkMidnight);
-  }, [petState]);
+  }, []);
 
   // Listen for electron IPC events
   useEffect(() => {
@@ -669,12 +677,12 @@ function AppContent() {
   useEffect(() => {
     const interval = setInterval(() => {
       if (Math.random() < 0.3) {
-        const memMsg = getMemoryChat(petState);
+        const memMsg = getMemoryChat(petStateRef.current);
         if (memMsg) { setChatBubble(memMsg); saveChatMessage(memMsg); }
       }
     }, 240000);
     return () => clearInterval(interval);
-  }, [petState.species]);
+  }, []);
 
   // Productivity buddy - listen for active window changes
   useEffect(() => {
@@ -718,13 +726,14 @@ function AppContent() {
 
       lastActivityCommentRef.current = now;
 
+      const currentPet = petStateRef.current;
       const petContext = {
-        species: petState.species || 'slime',
-        name: petState.name || 'Pet',
-        level: petState.level || 1,
-        mood: petState.happiness > 70 ? 'happy' : petState.happiness < 30 ? 'sad' : 'neutral',
-        happiness: petState.happiness || 50,
-        energy: petState.energy || 50,
+        species: currentPet.species || 'slime',
+        name: currentPet.name || 'Pet',
+        level: currentPet.level || 1,
+        mood: currentPet.happiness > 70 ? 'happy' : currentPet.happiness < 30 ? 'sad' : 'neutral',
+        happiness: currentPet.happiness || 50,
+        energy: currentPet.energy || 50,
       };
 
       const activityCtx = {
@@ -744,7 +753,7 @@ function AppContent() {
     });
 
     return () => unsubscribe();
-  }, [petState.species, petState.happiness, petState.energy]);
+  }, []);
 
   // Activity Monitor: idle detection (10+ minutes same window)
   useEffect(() => {
@@ -756,13 +765,14 @@ function AppContent() {
         if (now - lastActivityCommentRef.current < ACTIVITY_COMMENT_COOLDOWN) return;
         lastActivityCommentRef.current = now;
 
+        const currentPet = petStateRef.current;
         const petContext = {
-          species: petState.species || 'slime',
-          name: petState.name || 'Pet',
-          level: petState.level || 1,
-          mood: petState.happiness > 70 ? 'happy' : petState.happiness < 30 ? 'sad' : 'neutral',
-          happiness: petState.happiness || 50,
-          energy: petState.energy || 50,
+          species: currentPet.species || 'slime',
+          name: currentPet.name || 'Pet',
+          level: currentPet.level || 1,
+          mood: currentPet.happiness > 70 ? 'happy' : currentPet.happiness < 30 ? 'sad' : 'neutral',
+          happiness: currentPet.happiness || 50,
+          energy: currentPet.energy || 50,
         };
 
         const activity = getCurrentActivity();
@@ -786,7 +796,7 @@ function AppContent() {
     }, 60000); // Check every minute
 
     return () => clearInterval(idleCheckInterval);
-  }, [petState.species, petState.happiness, petState.energy]);
+  }, []);
 
   // Start ambient music based on habitat
   useEffect(() => {
@@ -955,6 +965,9 @@ function AppContent() {
   const handleUnequipAccessory = useCallback((accId) => { setPetState((prev) => unequipAccessory(prev, accId)); }, []);
 
   // Handle actions (from context menu or tray)
+  const showMiniPetRef = useRef(showMiniPet);
+  showMiniPetRef.current = showMiniPet;
+
   const handleAction = useCallback((action) => {
     setContextMenu(null);
     switch (action) {
@@ -1027,7 +1040,7 @@ function AppContent() {
       case 'aichat': setShowAIChat((prev) => !prev); break;
       case 'aisettings': setShowAISettings((prev) => !prev); break;
       case 'miniPet': {
-        const newVal = !showMiniPet;
+        const newVal = !showMiniPetRef.current;
         setShowMiniPet(newVal);
         try { localStorage.setItem('petdesk_mini_pet_visible', String(newVal)); } catch {}
         break;
