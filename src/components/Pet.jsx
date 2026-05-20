@@ -63,6 +63,8 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
   const animFrameRef = useRef(null);
   const targetRef = useRef(null);
   const idleTimerRef = useRef(null);
+  const isWalkingRef = useRef(isWalking);
+  isWalkingRef.current = isWalking;
   const [isShaking, setIsShaking] = useState(false);
   const [isTilting, setIsTilting] = useState(false);
   const [isHiding, setIsHiding] = useState(false);
@@ -231,34 +233,32 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
   walkFreqRef.current = personality.walkFrequencyMultiplier || 1;
 
   useEffect(() => {
-    const scheduleNextWalk = () => {
-      const baseIdle = (Math.random() * 3 + 1.5) * 1000; // 1.5-4.5s (much more frequent)
-      const idleTime = baseIdle / walkFreqRef.current;
-      idleTimerRef.current = setTimeout(() => {
-        if (petStateRef.current === 'idle' || petStateRef.current === 'happy') {
-          const dest = pickNewDestRef.current();
-          targetRef.current = dest;
-          setIsWalking(true);
-        }
-        scheduleNextWalk();
-      }, idleTime);
-    };
-
-    // Start first walk quickly (0.5-1.5s after mount)
-    const initialTimer = setTimeout(() => {
-      if (petStateRef.current === 'idle' || petStateRef.current === 'happy') {
+    // Use interval for reliable scheduling (recursive setTimeout can break)
+    const walkInterval = setInterval(() => {
+      const state = petStateRef.current;
+      // Allow walking in most states except sleeping/eating/dancing
+      if (state !== 'sleeping' && state !== 'eating' && state !== 'dancing' && !isWalkingRef.current) {
         const dest = pickNewDestRef.current();
         targetRef.current = dest;
         setIsWalking(true);
       }
-      scheduleNextWalk();
-    }, 500 + Math.random() * 1000);
+    }, (1500 + Math.random() * 3000) / (walkFreqRef.current || 1));
+
+    // Start first walk immediately
+    const initialTimer = setTimeout(() => {
+      const state = petStateRef.current;
+      if (state !== 'sleeping' && state !== 'eating' && state !== 'dancing') {
+        const dest = pickNewDestRef.current();
+        targetRef.current = dest;
+        setIsWalking(true);
+      }
+    }, 500);
 
     return () => {
+      clearInterval(walkInterval);
       clearTimeout(initialTimer);
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
-  }, []); // stable - uses refs for latest values
+  }, []); // stable - uses refs
 
   // Stop walking when state changes to sleeping/eating/dancing
   useEffect(() => {
@@ -270,8 +270,6 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
   }, [petState]);
 
   // Occasional jump (frequency modified by personality bounciness)
-  const isWalkingRef = useRef(isWalking);
-  isWalkingRef.current = isWalking;
   const onBounceRef = useRef(onBounce);
   onBounceRef.current = onBounce;
   const bounceFreqRef = useRef(personality.bounceFrequencyMultiplier || 1);
