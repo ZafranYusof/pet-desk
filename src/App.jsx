@@ -1095,9 +1095,12 @@ function AppContent() {
         window.electronAPI.setIgnoreMouse(false);
       }
     };
+    // Continuous interval as safety net (every 100ms force ignore OFF)
+    const interval = setInterval(keepAlive, 100);
     document.addEventListener('mousemove', keepAlive);
     document.addEventListener('mousedown', keepAlive);
     return () => {
+      clearInterval(interval);
       document.removeEventListener('mousemove', keepAlive);
       document.removeEventListener('mousedown', keepAlive);
     };
