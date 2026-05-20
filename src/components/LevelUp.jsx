@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function Particle({ delay }) {
@@ -24,14 +24,16 @@ function Particle({ delay }) {
 function LevelUp({ level, onComplete }) {
   const [visible, setVisible] = useState(true);
 
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
   useEffect(() => {
-    console.log('[PetDesk] 🎵 Level up sound effect!');
     const timer = setTimeout(() => {
       setVisible(false);
-      onComplete?.();
+      onCompleteRef.current?.();
     }, 3000);
     return () => clearTimeout(timer);
-  }, [onComplete]);
+  }, []);
 
   const particles = Array.from({ length: 24 }, (_, i) => i);
 
