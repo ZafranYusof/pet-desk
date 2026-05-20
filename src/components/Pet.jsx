@@ -86,17 +86,23 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
     return () => clearInterval(timer);
   }, [frames.length, interval]);
 
-  // Pick a new random destination along the bottom edge
+  // Pick a new random destination anywhere on screen
   const pickNewDestination = useCallback(() => {
     const minX = EDGE_PADDING;
     const maxX = screenWidth - PET_SIZE - EDGE_PADDING;
+    const minY = EDGE_PADDING + 60; // leave room for chat bubble above
+    const maxY = screenHeight - PET_SIZE - EDGE_PADDING;
     // 15% chance to go to screen edge (peek behavior)
+    let targetX, targetY;
     if (Math.random() < 0.15) {
-      return Math.random() < 0.5 ? minX - 20 : maxX + 20;
+      targetX = Math.random() < 0.5 ? minX - 20 : maxX + 20;
+      targetY = Math.floor(Math.random() * (maxY - minY)) + minY;
+    } else {
+      targetX = Math.floor(Math.random() * (maxX - minX)) + minX;
+      targetY = Math.floor(Math.random() * (maxY - minY)) + minY;
     }
-    const targetX = Math.floor(Math.random() * (maxX - minX)) + minX;
-    return targetX;
-  }, [screenWidth]);
+    return { x: targetX, y: targetY };
+  }, [screenWidth, screenHeight]);
 
   // Walk speed modifier based on time of day
   const walkSpeedModifier = timeOfDay === 'night' ? 0.5 : timeOfDay === 'evening' ? 0.8 : timeOfDay === 'morning' ? 1.3 : 1.0;
@@ -191,8 +197,9 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
         const target = targetRef.current;
         if (target === null) return prev;
 
-        const dx = target - prev.x;
-        const dist = Math.abs(dx);
+        const dx = target.x - prev.x;
+        const dy = target.y - prev.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
         const speed = effectiveWalkSpeedRef.current;
 
         if (dist < speed * 2) {
@@ -200,14 +207,16 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
           targetRef.current = null;
           setIsWalking(false);
           running = false;
-          const newPos = { ...prev, x: target };
+          const newPos = { x: target.x, y: target.y };
           if (onPositionChangeRef.current) onPositionChangeRef.current(newPos);
           return newPos;
         }
 
-        const dir = dx > 0 ? 1 : -1;
-        setWalkDirection(dir);
-        const newPos = { ...prev, x: prev.x + dir * speed * delta };
+        // Normalize direction
+        const dirX = dx / dist;
+        const dirY = dy / dist;
+        if (dirX !== 0) setWalkDirection(dirX > 0 ? 1 : -1);
+        const newPos = { x: prev.x + dirX * speed * delta, y: prev.y + dirY * speed * delta };
         if (onPositionChangeRef.current) onPositionChangeRef.current(newPos);
         return newPos;
       });

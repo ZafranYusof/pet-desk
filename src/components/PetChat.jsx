@@ -67,10 +67,10 @@ function ChatBubble({ message, species, onDismiss, petPosition }) {
     <motion.div
       style={{
         position: 'fixed',
-        left: petPosition ? petPosition.x : '50%',
-        top: petPosition ? petPosition.y - 80 : 100,
-        transform: 'translateX(-25%)',
-        zIndex: 40,
+        left: petPosition ? petPosition.x + 32 : '50%',
+        top: petPosition ? Math.max(10, petPosition.y - 90) : 100,
+        transform: 'translateX(-50%)',
+        zIndex: 9999,
         maxWidth: 200,
       }}
       className={`px-3 py-2 rounded-xl border backdrop-blur-sm cursor-pointer ${colorClass}`}
