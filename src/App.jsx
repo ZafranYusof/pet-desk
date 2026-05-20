@@ -170,6 +170,72 @@ function saveDailyStats(stats) {
   } catch (e) { /* ignore */ }
 }
 
+// Instant fallback reactions when AI is unavailable
+function getInstantReaction(activity) {
+  const category = activity?.category || 'other';
+  const proc = (activity?.processName || '').toLowerCase();
+  const title = (activity?.windowTitle || '').toLowerCase();
+
+  const reactions = {
+    coding: [
+      '💻 Coding mode activated!',
+      '💻 Let\'s build something cool!',
+      '💻 Ooh what are we working on?',
+      '💻 *watches you code intently*',
+      '💻 Bug hunting time?',
+    ],
+    browsing: [
+      '🌐 Browsing time~',
+      '🌐 What are we looking at?',
+      '🌐 *peeks at your screen*',
+      '🌐 Finding something interesting?',
+    ],
+    gaming: [
+      '🎮 Game time! Let\'s go!',
+      '🎮 Ooh can I watch?',
+      '🎮 *grabs popcorn*',
+      '🎮 Win this one for me!',
+    ],
+    creative: [
+      '🎨 Creative mode! Nice~',
+      '🎨 Making something pretty?',
+      '🎨 *watches in awe*',
+      '🎨 Artist at work!',
+    ],
+    communication: [
+      '💬 Chatting with someone?',
+      '💬 Say hi for me!',
+      '💬 *tries not to read your messages*',
+      '💬 Social time~',
+    ],
+    productivity: [
+      '📝 Work mode! You got this!',
+      '📝 Being productive today~',
+      '📝 *cheers you on*',
+    ],
+    media: [
+      '🎵 Entertainment time!',
+      '🎵 Ooh what are we watching?',
+      '🎵 *vibes along*',
+    ],
+    other: [
+      '👀 Hmm what\'s this?',
+      '👀 Switching things up!',
+      '👀 *curious*',
+    ],
+  };
+
+  // Specific app reactions
+  if (proc.includes('discord')) return '💬 Discord! Who\'s online?';
+  if (proc.includes('spotify')) return '🎵 Spotify! What\'s the vibe?';
+  if (proc.includes('chrome') && title.includes('youtube')) return '📺 YouTube time!';
+  if (proc.includes('explorer')) return '📁 Looking for files?';
+  if (proc.includes('notepad')) return '📝 Quick notes?';
+
+  const pool = reactions[category] || reactions.other;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function AppContent() {
   const [petState, setPetState] = useState(() => loadPet());
   const [showStats, setShowStats] = useState(false);
@@ -263,7 +329,7 @@ function AppContent() {
   // Activity monitoring state
   const [currentActivityState, setCurrentActivityState] = useState(null);
   const lastActivityCommentRef = useRef(0);
-  const ACTIVITY_COMMENT_COOLDOWN = 45 * 1000; // 45 seconds between activity comments
+  const ACTIVITY_COMMENT_COOLDOWN = 20 * 1000; // 20 seconds between activity comments
 
   // Multi-pet state
   const [petSlots, setPetSlots] = useState(() => getPetSlots());
@@ -803,9 +869,7 @@ function AppContent() {
       const now = Date.now();
       if (now - lastActivityCommentRef.current < ACTIVITY_COMMENT_COOLDOWN) return;
 
-      // 70% chance pet comments on activity change
-      if (Math.random() > 0.7) return;
-
+      // Pet ALWAYS comments on activity change (no random skip)
       lastActivityCommentRef.current = now;
 
       const currentPet = petStateRef.current;
@@ -828,9 +892,16 @@ function AppContent() {
         if (comment) {
           setChatBubble(comment);
           saveChatMessage(comment);
+          autoSpeak(comment);
+        } else {
+          // Fallback instant reaction
+          const fallback = getInstantReaction(activity);
+          if (fallback) { setChatBubble(fallback); saveChatMessage(fallback); autoSpeak(fallback); }
         }
       } catch (e) {
-        // Silently ignore
+        // Fallback instant reaction on AI failure
+        const fallback = getInstantReaction(activity);
+        if (fallback) { setChatBubble(fallback); saveChatMessage(fallback); autoSpeak(fallback); }
       }
     });
 
@@ -1840,7 +1911,7 @@ function AppContent() {
 
       {/* Achievement unlock popup */}
       <AnimatePresence>
-        {achievementPopup && (<AchievementPopup achievement={achievementPopup} onDismiss={handleAchievementDismiss} />)}
+        {achievementPopup && (<AchievementPopup key={achievementPopup.id || achievementPopup.name || Date.now()} achievement={achievementPopup} onDismiss={handleAchievementDismiss} />)}
       </AnimatePresence>
 
       {/* Level up celebration */}

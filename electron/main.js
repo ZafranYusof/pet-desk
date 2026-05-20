@@ -328,57 +328,91 @@ function startActivityDetection() {
 
 // Active window detection using PowerShell (real foreground window)
 function startActiveWindowDetection() {
-  const { execSync } = require('child_process');
+  const { exec } = require('child_process');
 
-  activeWindowInterval = setInterval(() => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-
-    try {
-      const psScript = `
+  // Pre-compile the C# type once, then reuse
+  const psScript = `
 Add-Type @"
   using System;
   using System.Runtime.InteropServices;
-  public class ForegroundWindow {
-    [DllImport("user32.dll")]
-    public static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")]
-    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
-    [DllImport("user32.dll", CharSet = CharSet.Auto)]
-    public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int count);
+  public class FGW {
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+    [DllImport("user32.dll", CharSet = CharSet.Auto)] public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int count);
   }
 "@
-$hwnd = [ForegroundWindow]::GetForegroundWindow()
-$pid = 0
-[ForegroundWindow]::GetWindowThreadProcessId($hwnd, [ref]$pid) | Out-Null
-$sb = New-Object System.Text.StringBuilder 256
-[ForegroundWindow]::GetWindowText($hwnd, $sb, 256) | Out-Null
-$proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
-@{ processName = $proc.ProcessName; windowTitle = $sb.ToString() } | ConvertTo-Json -Compress
+while($true) {
+  $hwnd = [FGW]::GetForegroundWindow()
+  $pid = 0
+  [FGW]::GetWindowThreadProcessId($hwnd, [ref]$pid) | Out-Null
+  $sb = New-Object System.Text.StringBuilder 256
+  [FGW]::GetWindowText($hwnd, $sb, 256) | Out-Null
+  $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+  [Console]::WriteLine((@{ p = $proc.ProcessName; t = $sb.ToString() } | ConvertTo-Json -Compress))
+  Start-Sleep -Seconds 3
+}
 `;
-      const result = execSync(`powershell -NoProfile -NonInteractive -Command "${psScript.replace(/"/g, '\"').replace(/\n/g, ' ')}"`, {
-        encoding: 'utf8',
-        timeout: 5000,
-        windowsHide: true,
-      }).trim();
 
-      if (result) {
-        const parsed = JSON.parse(result);
-        const processName = parsed.processName || '';
-        const windowTitle = parsed.windowTitle || '';
+  let psProcess = null;
+  let buffer = '';
 
-        // Only send when window actually changes
-        if (processName !== lastActiveWindowProcess || windowTitle !== lastActiveWindowTitle) {
-          lastActiveWindowProcess = processName;
-          lastActiveWindowTitle = windowTitle;
-          mainWindow.webContents.send('active-window', { processName, windowTitle });
-          // Also send to existing active-window-change for backward compat
-          mainWindow.webContents.send('active-window-change', { title: windowTitle, name: processName });
-        }
+  try {
+    psProcess = exec(`powershell -NoProfile -NonInteractive -Command "${psScript.replace(/"/g, '\"').replace(/\n/g, ' ')}"`, {
+      windowsHide: true,
+    });
+
+    psProcess.stdout.on('data', (data) => {
+      buffer += data;
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // keep incomplete line
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const parsed = JSON.parse(trimmed);
+          const processName = parsed.p || '';
+          const windowTitle = parsed.t || '';
+          if (processName !== lastActiveWindowProcess || windowTitle !== lastActiveWindowTitle) {
+            lastActiveWindowProcess = processName;
+            lastActiveWindowTitle = windowTitle;
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('active-window', { processName, windowTitle });
+              mainWindow.webContents.send('active-window-change', { title: windowTitle, name: processName });
+            }
+          }
+        } catch (e) { /* ignore parse errors */ }
       }
-    } catch (e) {
-      // Silently ignore errors (timeout, parse failures, etc.)
-    }
-  }, 10000); // Every 10 seconds
+    });
+
+    psProcess.on('exit', () => {
+      // Restart if it dies unexpectedly
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) startActiveWindowDetection();
+      }, 5000);
+    });
+
+    // Store reference for cleanup
+    activeWindowInterval = { kill: () => { if (psProcess) psProcess.kill(); } };
+  } catch (e) {
+    // Fallback to old interval method
+    activeWindowInterval = setInterval(() => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      try {
+        const { execSync } = require('child_process');
+        const fallbackScript = `$hwnd = (Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();' -Name W -PassThru)::GetForegroundWindow(); $pid = 0; (Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint p);' -Name P -PassThru)::GetWindowThreadProcessId($hwnd,[ref]$pid)|Out-Null; $p = Get-Process -Id $pid -EA 0; @{p=$p.ProcessName;t=''} | ConvertTo-Json -Compress`;
+        const result = execSync(`powershell -NoProfile -NonInteractive -Command "${fallbackScript}"`, { encoding: 'utf8', timeout: 3000, windowsHide: true }).trim();
+        if (result) {
+          const parsed = JSON.parse(result);
+          if (parsed.p !== lastActiveWindowProcess) {
+            lastActiveWindowProcess = parsed.p;
+            lastActiveWindowTitle = parsed.t || '';
+            mainWindow.webContents.send('active-window', { processName: parsed.p, windowTitle: parsed.t || '' });
+            mainWindow.webContents.send('active-window-change', { title: parsed.t || '', name: parsed.p });
+          }
+        }
+      } catch (e) { /* ignore */ }
+    }, 5000);
+  }
 }
 
 function startClipboardMonitoring() {
@@ -451,7 +485,7 @@ app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   if (idleCheckInterval) clearInterval(idleCheckInterval);
   if (activityCheckInterval) clearInterval(activityCheckInterval);
-  if (activeWindowInterval) clearInterval(activeWindowInterval);
+  if (activeWindowInterval) { if (activeWindowInterval.kill) activeWindowInterval.kill(); else clearInterval(activeWindowInterval); }
   if (clipboardCheckInterval) clearInterval(clipboardCheckInterval);
 });
 
