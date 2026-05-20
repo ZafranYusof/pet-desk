@@ -25,6 +25,7 @@ const categories = [
     items: [
       { id: 'breed', icon: '🧬', label: 'Breed', disableCheck: (s) => (s?.level || 1) < 10 },
       { id: 'chat', icon: '💬', label: 'Chat' },
+      { id: 'aichat', icon: '💬🤖', label: 'AI Chat' },
       { id: 'leaderboard', icon: '🏅', label: 'Ranks' },
       { id: 'pets', icon: '👥', label: 'Pets' },
     ],
@@ -71,6 +72,7 @@ const categories = [
       { id: 'notifications', icon: '🔔', label: 'Inbox' },
       { id: 'activityLog', icon: '📋', label: 'Log' },
       { id: 'widget', icon: '📊', label: 'Widget' },
+      { id: 'aisettings', icon: '⚙️🤖', label: 'AI' },
     ],
   },
 ];

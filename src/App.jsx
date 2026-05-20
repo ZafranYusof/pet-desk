@@ -111,6 +111,9 @@ import SkillTree from './components/SkillTree';
 import { awardSkillPoint } from './services/skillService';
 import ImportExport from './components/ImportExport';
 import { getDecorationBonuses } from './services/decorationService';
+import AIChatPanel from './components/AIChatPanel';
+import AISettings from './components/AISettings';
+import { getAISettings, generateIdleChat } from './services/aiChatService';
 
 // Daily stats storage key
 const DAILY_STATS_KEY = 'petdesk_daily_stats';
@@ -213,6 +216,8 @@ function AppContent() {
   const [showHomeDecorator, setShowHomeDecorator] = useState(false);
   const [showSkillTree, setShowSkillTree] = useState(false);
   const [showImportExport, setShowImportExport] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [showAISettings, setShowAISettings] = useState(false);
   const [showMiniPet, setShowMiniPet] = useState(() => {
     try { return localStorage.getItem('petdesk_mini_pet_visible') === 'true'; } catch { return false; }
   });
@@ -413,9 +418,28 @@ function AppContent() {
   useEffect(() => {
     function scheduleChatMessage() {
       const delay = 120000 + Math.random() * 180000;
-      chatTimerRef.current = setTimeout(() => {
-        const msg = getIdleChat(petState);
-        if (msg) { setChatBubble(msg); saveChatMessage(msg); }
+      chatTimerRef.current = setTimeout(async () => {
+        const aiSettings = getAISettings();
+        if (aiSettings.useAIForAutoChat) {
+          try {
+            const petContext = {
+              species: petState.species || 'slime',
+              name: petState.name || 'Pet',
+              level: petState.level || 1,
+              mood: petState.happiness > 70 ? 'happy' : petState.happiness < 30 ? 'sad' : 'neutral',
+              happiness: petState.happiness || 50,
+              energy: petState.energy || 50,
+            };
+            const msg = await generateIdleChat(petContext);
+            if (msg) { setChatBubble(msg); saveChatMessage(msg); }
+          } catch (e) {
+            const msg = getIdleChat(petState);
+            if (msg) { setChatBubble(msg); saveChatMessage(msg); }
+          }
+        } else {
+          const msg = getIdleChat(petState);
+          if (msg) { setChatBubble(msg); saveChatMessage(msg); }
+        }
         scheduleChatMessage();
       }, delay);
     }
@@ -899,6 +923,8 @@ function AppContent() {
       case 'decorate': setShowHomeDecorator((prev) => !prev); break;
       case 'skills': setShowSkillTree((prev) => !prev); break;
       case 'importExport': setShowImportExport((prev) => !prev); break;
+      case 'aichat': setShowAIChat((prev) => !prev); break;
+      case 'aisettings': setShowAISettings((prev) => !prev); break;
       case 'miniPet': {
         const newVal = !showMiniPet;
         setShowMiniPet(newVal);
@@ -929,7 +955,7 @@ function AppContent() {
   const noopBounce = useCallback(() => {}, []);
 
   // Global mouse event toggle: disable click-through when any panel/modal is open
-  const anyPanelOpen = showStats || showPetSelector || showAccessoryShop || showDiary || showAchievements || showScrapbook || showDailyReward || showWidget || showSpriteEditor || showFoodMenu || showBirthday || showSoundSettings || showStatsDashboard || showBattle || showDungeon || showPhotoMode || showHabitatSelector || showStory || showGarden || showJobBoard || showArcade || showPetRoom || showCrafting || showBreedingLab || showChatLog || showLeaderboard || showActivityLog || showKeybindSettings || showColorPalette || showSeasonalEvent || showDreamSequence || showDreamLog || showPomodoro || showQuestBoard || showNotificationCenter || showOnboarding || showPetSlots || showEvolutionTree || showHomeDecorator || showSkillTree || showImportExport || contextMenu !== null || activeGame !== null;
+  const anyPanelOpen = showStats || showPetSelector || showAccessoryShop || showDiary || showAchievements || showScrapbook || showDailyReward || showWidget || showSpriteEditor || showFoodMenu || showBirthday || showSoundSettings || showStatsDashboard || showBattle || showDungeon || showPhotoMode || showHabitatSelector || showStory || showGarden || showJobBoard || showArcade || showPetRoom || showCrafting || showBreedingLab || showChatLog || showLeaderboard || showActivityLog || showKeybindSettings || showColorPalette || showSeasonalEvent || showDreamSequence || showDreamLog || showPomodoro || showQuestBoard || showNotificationCenter || showOnboarding || showPetSlots || showEvolutionTree || showHomeDecorator || showSkillTree || showImportExport || showAIChat || showAISettings || contextMenu !== null || activeGame !== null;
 
   // Use layoutEffect for synchronous mouse toggle (no frame delay)
   // This is the SINGLE source of truth for ignore mouse state
@@ -1430,6 +1456,20 @@ function AppContent() {
             onImport={(importedPet) => { setPetState((prev) => ({ ...prev, ...importedPet })); setShowImportExport(false); }}
             onClose={() => setShowImportExport(false)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* AI Chat Panel */}
+      <AnimatePresence>
+        {showAIChat && (
+          <AIChatPanel petState={petState} onClose={() => setShowAIChat(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* AI Settings */}
+      <AnimatePresence>
+        {showAISettings && (
+          <AISettings onClose={() => setShowAISettings(false)} />
         )}
       </AnimatePresence>
 
