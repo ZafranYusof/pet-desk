@@ -5,6 +5,9 @@ const GAMES = [
   { id: 'flappyPet', name: 'Flappy Pet', icon: '🐦', unlockLevel: 1 },
   { id: 'snake', name: 'Snake', icon: '🐍', unlockLevel: 3 },
   { id: 'blockStack', name: 'Block Stack', icon: '🧱', unlockLevel: 7 },
+  { id: 'tetris', name: 'Tetris Pet', icon: '🧱', unlockLevel: 5 },
+  { id: 'rhythm', name: 'Rhythm Pet', icon: '🎵', unlockLevel: 8 },
+  { id: 'racing', name: 'Pet Racing', icon: '🏃', unlockLevel: 4 },
 ];
 
 function loadArcadeState() {
@@ -13,7 +16,7 @@ function loadArcadeState() {
     if (stored) return JSON.parse(stored);
   } catch (e) { /* ignore */ }
   return {
-    highScores: { flappyPet: 0, snake: 0, blockStack: 0 },
+    highScores: { flappyPet: 0, snake: 0, blockStack: 0, tetris: 0, rhythm: 0, racing: 0 },
     gamesPlayed: 0,
     totalScore: 0,
   };

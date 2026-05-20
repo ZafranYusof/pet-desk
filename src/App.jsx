@@ -62,6 +62,24 @@ import DungeonCrawler from './components/DungeonCrawler';
 import PhotoMode from './components/PhotoMode';
 import { ChatBubble, ChatLog } from './components/PetChat';
 import { generateMessage, getGreeting, getIdleChat, saveChatMessage } from './services/petChatService';
+import { isFirstRun, setOwnerName, getOwnerName, recordMemoryEvent, addMilestone, getMemoryChat } from './services/memoryService';
+import { shouldDream, getRandomDream, getDreamMoodEffect, saveDreamToLog } from './services/dreamService';
+import { DreamSequence, DreamLogPanel } from './components/DreamSequence';
+import { initVisualAging, getVisualAge, getVisualAgeStage, getAgeScaleFactor, checkStageTransition } from './services/visualAgingService';
+import { getAppReaction, categorizeApp } from './services/productivityService';
+import { startPomodoro, stopPomodoro, getPomodoroStatus, tickPomodoro } from './services/pomodoroService';
+import PomodoroMode from './components/PomodoroMode';
+import { getClipboardReaction, isClipboardEnabled } from './services/clipboardService';
+import TetrisPet from './games/TetrisPet';
+import RhythmPet from './games/RhythmPet';
+import PetRacing from './games/PetRacing';
+import { getDailyQuests, getWeeklyQuests, recordQuestProgress, getUnclaimedQuestCount } from './services/questService';
+import QuestBoard from './components/QuestBoard';
+import { addNotification, getUnreadCount } from './services/notificationCenterService';
+import NotificationCenter from './components/NotificationCenter';
+import { shouldShowOnboarding } from './services/onboardingService';
+import Onboarding from './components/Onboarding';
+import { startAmbientMusic, stopAmbientMusic } from './services/soundService';
 import { tickGarden, getGardenNotifications, getGarden } from './services/gardenService';
 import { recordFirstFeed, recordFirstPlay, recordFirstPet, recordLevelUp, recordSpeciesUnlock, recordAccessoryEquip, recordAchievement, recordStreak, recordGameWin as recordGameWinScrapbook } from './services/scrapbookService';
 import { recordInteraction as recordStatsInteraction, recordLevelUp as recordStatsLevelUp, recordEvolution as recordStatsEvolution, recordAchievementUnlock as recordStatsAchievement, recordGamePlayed as recordStatsGame, recordGameWin as recordStatsGameWin, startPlaytimeTracking, stopPlaytimeTracking } from './services/statsService';
@@ -169,6 +187,14 @@ function AppContent() {
   const [edgeReaction, setEdgeReaction] = useState(null);
   const [colorPalette, setColorPalette] = useState(() => loadPalette());
   const [petSpriteClass, setPetSpriteClass] = useState('');
+
+  // New v0.8 state
+  const [showDreamSequence, setShowDreamSequence] = useState(false);
+  const [showDreamLog, setShowDreamLog] = useState(false);
+  const [showPomodoro, setShowPomodoro] = useState(false);
+  const [showQuestBoard, setShowQuestBoard] = useState(false);
+  const [showNotificationCenter, setShowNotificationCenter] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Multi-pet state
   const [petSlots, setPetSlots] = useState(() => getPetSlots());
@@ -515,6 +541,102 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // === NEW v0.8 EFFECTS ===
+
+  // Initialize visual aging on mount
+  useEffect(() => {
+    initVisualAging(petState.createdAt);
+  }, []);
+
+  // Check visual age stage transitions every 60s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const transition = checkStageTransition();
+      if (transition) {
+        addNotification(
+          `${transition.emoji} Stage Up!`,
+          `Your pet grew into a ${transition.stageName}!`,
+          'pet', transition.emoji
+        );
+      }
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Dream check when pet is sleeping (every 30s)
+  useEffect(() => {
+    if (petState.state !== 'sleeping') return;
+    const interval = setInterval(() => {
+      if (shouldDream() && !showDreamSequence) {
+        setShowDreamSequence(true);
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [petState.state, showDreamSequence]);
+
+  // Memory-based chat (every 3-6 minutes, mix with regular chat)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (Math.random() < 0.3) {
+        const memMsg = getMemoryChat(petState);
+        if (memMsg) { setChatBubble(memMsg); saveChatMessage(memMsg); }
+      }
+    }, 240000);
+    return () => clearInterval(interval);
+  }, [petState.species]);
+
+  // Productivity buddy - listen for active window changes
+  useEffect(() => {
+    if (!window.electronAPI?.onActiveWindowChange) return;
+    window.electronAPI.onActiveWindowChange((data) => {
+      const reaction = getAppReaction(data.title || data.name || '');
+      if (reaction) {
+        setChatBubble(reaction.text);
+        saveChatMessage(reaction.text);
+      }
+    });
+  }, []);
+
+  // Clipboard monitoring
+  useEffect(() => {
+    if (!window.electronAPI?.onClipboardChange) return;
+    window.electronAPI.onClipboardChange((text) => {
+      if (!isClipboardEnabled()) return;
+      const reaction = getClipboardReaction(text);
+      if (reaction) {
+        setChatBubble(reaction.text);
+        saveChatMessage(reaction.text);
+      }
+    });
+  }, []);
+
+  // Start ambient music based on habitat
+  useEffect(() => {
+    startAmbientMusic(activeHabitat);
+    return () => stopAmbientMusic();
+  }, [activeHabitat]);
+
+  // Onboarding check on mount
+  useEffect(() => {
+    if (shouldShowOnboarding()) {
+      const timer = setTimeout(() => setShowOnboarding(true), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Owner name prompt (memory system first run)
+  useEffect(() => {
+    if (isFirstRun()) {
+      // Will be handled by onboarding or a simple prompt
+      // For now, set a default that can be changed
+      const name = localStorage.getItem('petdesk_owner_name_pending');
+      if (name) {
+        setOwnerName(name);
+        localStorage.removeItem('petdesk_owner_name_pending');
+      }
+    }
+  }, []);
+
   function clearActionTimeout() {
     if (actionTimeoutRef.current) { clearTimeout(actionTimeoutRef.current); actionTimeoutRef.current = null; }
   }
@@ -575,6 +697,8 @@ function AppContent() {
     recordInteraction();
     recordStatsInteraction('pet');
     recordPersonalityInteraction('pet');
+    recordMemoryEvent('pet');
+    recordQuestProgress('pet');
     logPetted();
     dailyStatsRef.current.timesPetted = (dailyStatsRef.current.timesPetted || 0) + 1;
     saveDailyStats(dailyStatsRef.current);
@@ -649,6 +773,7 @@ function AppContent() {
         setPetState((prev) => { const updated = feed(prev); checkLevelUp(prev, updated); return updated; });
         setTriggerEmote({ type: 'heart', t: Date.now() });
         recordInteraction(); recordStatsInteraction('feed'); recordPersonalityInteraction('feed'); logFed();
+        recordMemoryEvent('feed'); recordQuestProgress('feed');
         dailyStatsRef.current.timesFed = (dailyStatsRef.current.timesFed || 0) + 1;
         saveDailyStats(dailyStatsRef.current);
         clearActionTimeout();
@@ -661,6 +786,7 @@ function AppContent() {
         setPetState((prev) => { const updated = play(prev); checkLevelUp(prev, updated); return updated; });
         setTriggerEmote({ type: 'music', t: Date.now() });
         recordInteraction(); recordStatsInteraction('play'); recordPersonalityInteraction('play'); logPlayed();
+        recordMemoryEvent('play'); recordQuestProgress('game');
         dailyStatsRef.current.timesPlayed = (dailyStatsRef.current.timesPlayed || 0) + 1;
         saveDailyStats(dailyStatsRef.current);
         clearActionTimeout();
@@ -695,6 +821,11 @@ function AppContent() {
       case 'habitat': setShowHabitatSelector((prev) => !prev); break;
       case 'breed': setShowBreedingLab((prev) => !prev); break;
       case 'chat': setShowChatLog((prev) => !prev); break;
+      case 'pomodoro': setShowPomodoro((prev) => !prev); break;
+      case 'quests': setShowQuestBoard((prev) => !prev); break;
+      case 'notifications': setShowNotificationCenter((prev) => !prev); break;
+      case 'dreamLog': setShowDreamLog((prev) => !prev); break;
+      case 'onboarding': setShowOnboarding(true); break;
       case 'pets': setShowPetSlots((prev) => !prev); break;
       case 'activityLog': setShowActivityLog((prev) => !prev); break;
       case 'keybinds': setShowKeybindSettings((prev) => !prev); break;
@@ -1050,6 +1181,78 @@ function AppContent() {
           }} onClose={() => setShowSeasonalEvent(false)} />
         )}
       </AnimatePresence>
+
+      {/* Arcade Games - New */}
+      <AnimatePresence>
+        {activeGame === 'tetris' && (
+          <TetrisPet onBack={() => { setActiveGame(null); setShowArcade(true); }} onGameEnd={(score) => { saveHighScore('tetris', score); submitScore('arcadeHighScore', score); recordGamePlayed(score); recordQuestProgress('game'); recordMemoryEvent('game', { game: 'tetris', score }); const xpGain = Math.floor(score / 10); if (xpGain > 0) { setPetState((prev) => { const updated = { ...prev }; updated.xp = (updated.xp || 0) + xpGain; updated.level = calculateLevel(updated.xp); return updated; }); } }} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {activeGame === 'rhythm' && (
+          <RhythmPet onBack={() => { setActiveGame(null); setShowArcade(true); }} onGameEnd={(score) => { saveHighScore('rhythm', score); submitScore('arcadeHighScore', score); recordGamePlayed(score); recordQuestProgress('game'); recordMemoryEvent('game', { game: 'rhythm', score }); const xpGain = Math.floor(score / 10); if (xpGain > 0) { setPetState((prev) => { const updated = { ...prev }; updated.xp = (updated.xp || 0) + xpGain; updated.level = calculateLevel(updated.xp); return updated; }); } }} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {activeGame === 'racing' && (
+          <PetRacing onBack={() => { setActiveGame(null); setShowArcade(true); }} onGameEnd={(score) => { saveHighScore('racing', score); submitScore('arcadeHighScore', score); recordGamePlayed(score); recordQuestProgress('game'); recordMemoryEvent('game', { game: 'racing', score }); const xpGain = Math.floor(score / 10); if (xpGain > 0) { setPetState((prev) => { const updated = { ...prev }; updated.xp = (updated.xp || 0) + xpGain; updated.level = calculateLevel(updated.xp); return updated; }); } }} />
+        )}
+      </AnimatePresence>
+
+      {/* Quest Board */}
+      <AnimatePresence>
+        {showQuestBoard && (
+          <QuestBoard onClose={() => setShowQuestBoard(false)} onReward={(reward) => {
+            setPetState((prev) => {
+              const updated = { ...prev };
+              if (reward.xp) { updated.xp = (updated.xp || 0) + reward.xp; updated.level = calculateLevel(updated.xp); }
+              return updated;
+            });
+            if (reward.coins) addCoins(reward.coins);
+          }} />
+        )}
+      </AnimatePresence>
+
+      {/* Pomodoro Mode */}
+      <AnimatePresence>
+        {showPomodoro && (
+          <PomodoroMode onClose={() => setShowPomodoro(false)} onSessionComplete={(xp) => {
+            setPetState((prev) => { const updated = { ...prev }; updated.xp = (updated.xp || 0) + xp; updated.level = calculateLevel(updated.xp); return updated; });
+            recordQuestProgress('pomodoro');
+            addNotification('🍅 Focus Complete!', 'Great focus session! Bonus XP earned.', 'system', '🍅');
+          }} />
+        )}
+      </AnimatePresence>
+
+      {/* Notification Center */}
+      <AnimatePresence>
+        {showNotificationCenter && (
+          <NotificationCenter onClose={() => setShowNotificationCenter(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Dream Sequence */}
+      <AnimatePresence>
+        {showDreamSequence && (
+          <DreamSequence
+            onComplete={() => setShowDreamSequence(false)}
+            onMoodEffect={(effect) => {
+              setPetState((prev) => ({
+                ...prev,
+                happiness: Math.max(0, Math.min(100, (prev.happiness || 50) + (effect.happiness || 0))),
+              }));
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Dream Log */}
+      <AnimatePresence>
+        {showDreamLog && (<DreamLogPanel onClose={() => setShowDreamLog(false)} />)}
+      </AnimatePresence>
+
+      {/* Onboarding */}
+      {showOnboarding && (<Onboarding onComplete={() => setShowOnboarding(false)} />)}
 
       {/* Daily Reward popup */}
       <AnimatePresence>
