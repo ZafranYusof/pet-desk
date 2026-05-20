@@ -802,7 +802,7 @@ function AppContent() {
     addToInventory(rewards.food, rewards.foodCount);
   }, []);
 
-  const handleContextMenu = useCallback((e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }); }, []);
+  const handleContextMenu = useCallback((e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }); if (window.electronAPI?.setIgnoreMouse) window.electronAPI.setIgnoreMouse(false); }, []);
 
   const handleSummonCompanion = useCallback((slotIndex) => {
     const slots = getPetSlots();
@@ -931,7 +931,8 @@ function AppContent() {
   // Global mouse event toggle: disable click-through when any panel/modal is open
   const anyPanelOpen = showStats || showPetSelector || showAccessoryShop || showDiary || showAchievements || showScrapbook || showDailyReward || showWidget || showSpriteEditor || showFoodMenu || showBirthday || showSoundSettings || showStatsDashboard || showBattle || showDungeon || showPhotoMode || showHabitatSelector || showStory || showGarden || showJobBoard || showArcade || showPetRoom || showCrafting || showBreedingLab || showChatLog || showLeaderboard || showActivityLog || showKeybindSettings || showColorPalette || showSeasonalEvent || showDreamSequence || showDreamLog || showPomodoro || showQuestBoard || showNotificationCenter || showOnboarding || showPetSlots || showEvolutionTree || showHomeDecorator || showSkillTree || showImportExport || contextMenu !== null || activeGame !== null;
 
-  useEffect(() => {
+  // Use layoutEffect for synchronous mouse toggle (no frame delay)
+  React.useLayoutEffect(() => {
     if (window.electronAPI?.setIgnoreMouse) {
       window.electronAPI.setIgnoreMouse(!anyPanelOpen);
     }

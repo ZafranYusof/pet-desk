@@ -96,18 +96,20 @@ function BirthdayEvent({ petName, petAge, rewards, onCelebrate, onDismiss }) {
   const [showFireworks, setShowFireworks] = useState(false);
   const [celebrated, setCelebrated] = useState(false);
   const dismissTimerRef = useRef(null);
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
 
   // Auto-dismiss after 10s
   useEffect(() => {
     dismissTimerRef.current = setTimeout(() => {
       if (!celebrated) {
-        onDismiss();
+        onDismissRef.current();
       }
     }, 10000);
     return () => {
       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     };
-  }, [celebrated, onDismiss]);
+  }, [celebrated]);
 
   function handleCelebrate() {
     setCelebrated(true);

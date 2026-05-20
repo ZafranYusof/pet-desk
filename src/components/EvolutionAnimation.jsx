@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PetSprite from './PetSprite';
 import sprites from '../data/sprites';
@@ -11,6 +11,8 @@ import evolvedSprites from '../data/evolvedSprites';
 function EvolutionAnimation({ oldSpriteKey, newSpriteKey, evolutionName, onComplete }) {
   const [phase, setPhase] = useState('glow'); // glow → flash → reveal → celebrate
   const [particles, setParticles] = useState([]);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   const oldSprite = sprites[oldSpriteKey] || evolvedSprites[oldSpriteKey];
   const newSprite = evolvedSprites[newSpriteKey] || sprites[newSpriteKey];
@@ -22,10 +24,10 @@ function EvolutionAnimation({ oldSpriteKey, newSpriteKey, evolutionName, onCompl
     timers.push(setTimeout(() => setPhase('reveal'), 2300));
     timers.push(setTimeout(() => setPhase('celebrate'), 2800));
     timers.push(setTimeout(() => {
-      if (onComplete) onComplete();
+      if (onCompleteRef.current) onCompleteRef.current();
     }, 7000));
     return () => timers.forEach(clearTimeout);
-  }, [onComplete]);
+  }, []);
 
   // Generate swirling particles
   useEffect(() => {

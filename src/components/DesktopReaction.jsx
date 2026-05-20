@@ -1,19 +1,21 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function DesktopReaction({ reaction, onDismiss }) {
   const [visible, setVisible] = useState(false);
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
 
   useEffect(() => {
     if (reaction) {
       setVisible(true);
       const timer = setTimeout(() => {
         setVisible(false);
-        if (onDismiss) setTimeout(onDismiss, 300);
+        if (onDismissRef.current) setTimeout(onDismissRef.current, 300);
       }, 4000);
       return () => clearTimeout(timer);
     }
-  }, [reaction, onDismiss]);
+  }, [reaction]);
 
   if (!reaction) return null;
 
