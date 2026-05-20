@@ -15,9 +15,20 @@ const MINI_SPRITES = {
   ghost: '👻',
 };
 
+const moodRingColors = {
+  happy: '#fbbf24',
+  content: '#a78bfa',
+  hungry: '#f87171',
+  tired: '#60a5fa',
+  sad: '#93c5fd',
+  excited: '#f472b6',
+  neutral: '#a78bfa',
+  sleepy: '#818cf8',
+  calm: '#a78bfa',
+};
+
 function MiniPet({ petState, visible, onQuickFeed, onToggle, corner = 'bottom-right' }) {
   const [showActions, setShowActions] = useState(false);
-  const [expanded, setExpanded] = useState(false);
 
   if (!visible) return null;
 
@@ -25,6 +36,7 @@ function MiniPet({ petState, visible, onQuickFeed, onToggle, corner = 'bottom-ri
   const moodState = getMoodState();
   const mood = MOODS[moodState.currentMood] || MOODS.calm;
   const position = CORNERS[corner] || CORNERS['bottom-right'];
+  const moodColor = moodRingColors[moodState.currentMood] || '#a78bfa';
 
   const happiness = petState?.happiness ?? 50;
   const energy = petState?.energy ?? 50;
@@ -43,47 +55,67 @@ function MiniPet({ petState, visible, onQuickFeed, onToggle, corner = 'bottom-ri
       <AnimatePresence>
         {showActions && (
           <motion.div
-            className="absolute bottom-full mb-2 right-0 bg-gray-900/95 backdrop-blur-md rounded-lg border border-gray-700/50 shadow-xl p-2 min-w-[120px]"
+            className="absolute bottom-full mb-3 right-0 bg-gray-900/95 backdrop-blur-2xl rounded-xl border border-white/10 shadow-2xl shadow-black/60 p-2.5 min-w-[130px]"
             initial={{ opacity: 0, y: 10, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.9 }}
-            transition={{ duration: 0.12 }}
+            transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
           >
-            {/* Mini stats */}
-            <div className="space-y-1 mb-2 px-1">
-              <div className="flex items-center gap-1">
-                <span className="text-[9px]">❤️</span>
-                <div className="flex-1 h-1 bg-gray-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-red-400 rounded-full" style={{ width: `${happiness}%` }} />
+            {/* Mini stats with colored bars */}
+            <div className="space-y-1.5 mb-2.5 px-0.5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] w-3">🍖</span>
+                <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-red-400 to-red-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${hunger}%` }}
+                    transition={{ duration: 0.5 }}
+                  />
                 </div>
+                <span className="text-[8px] text-gray-500 w-5 text-right font-mono">{Math.round(hunger)}</span>
               </div>
-              <div className="flex items-center gap-1">
-                <span className="text-[9px]">⚡</span>
-                <div className="flex-1 h-1 bg-gray-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${energy}%` }} />
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] w-3">⚡</span>
+                <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-blue-400 to-blue-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${energy}%` }}
+                    transition={{ duration: 0.5 }}
+                  />
                 </div>
+                <span className="text-[8px] text-gray-500 w-5 text-right font-mono">{Math.round(energy)}</span>
               </div>
-              <div className="flex items-center gap-1">
-                <span className="text-[9px]">🍖</span>
-                <div className="flex-1 h-1 bg-gray-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-green-400 rounded-full" style={{ width: `${hunger}%` }} />
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] w-3">💛</span>
+                <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${happiness}%` }}
+                    transition={{ duration: 0.5 }}
+                  />
                 </div>
+                <span className="text-[8px] text-gray-500 w-5 text-right font-mono">{Math.round(happiness)}</span>
               </div>
             </div>
 
             {/* Quick actions */}
-            <div className="flex gap-1">
+            <div className="flex gap-1.5">
               <motion.button
-                className="flex-1 px-2 py-1 bg-green-900/40 border border-green-700/40 rounded text-[10px] text-green-300 cursor-pointer hover:bg-green-800/40"
+                className="flex-1 px-2 py-1.5 bg-green-500/15 border border-green-500/30 rounded-lg text-[10px] text-green-300 cursor-pointer hover:bg-green-500/25 transition-colors font-medium"
                 onClick={() => { onQuickFeed?.(); setShowActions(false); }}
-                whileTap={{ scale: 0.9 }}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.95 }}
               >
                 🍖 Feed
               </motion.button>
               <motion.button
-                className="flex-1 px-2 py-1 bg-red-900/40 border border-red-700/40 rounded text-[10px] text-red-300 cursor-pointer hover:bg-red-800/40"
+                className="flex-1 px-2 py-1.5 bg-red-500/15 border border-red-500/30 rounded-lg text-[10px] text-red-300 cursor-pointer hover:bg-red-500/25 transition-colors font-medium"
                 onClick={() => { onToggle?.(); setShowActions(false); }}
-                whileTap={{ scale: 0.9 }}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.95 }}
               >
                 ✕ Hide
               </motion.button>
@@ -92,25 +124,35 @@ function MiniPet({ petState, visible, onQuickFeed, onToggle, corner = 'bottom-ri
         )}
       </AnimatePresence>
 
-      {/* Mini pet body */}
+      {/* Mini pet body with mood-colored ring */}
       <motion.button
-        className="relative w-10 h-10 rounded-full bg-gray-900/80 backdrop-blur-sm border-2 border-gray-600/50 flex items-center justify-center cursor-pointer shadow-lg hover:shadow-purple-500/20"
+        className="relative w-11 h-11 rounded-full flex items-center justify-center cursor-pointer"
+        style={{
+          background: 'rgba(17, 24, 39, 0.9)',
+          backdropFilter: 'blur(12px)',
+          boxShadow: `0 0 0 2px ${moodColor}50, 0 4px 16px rgba(0,0,0,0.4), 0 0 12px ${moodColor}20`,
+        }}
         onClick={() => setShowActions(!showActions)}
-        whileHover={{ scale: 1.1 }}
+        whileHover={{ scale: 1.15 }}
         whileTap={{ scale: 0.9 }}
         animate={{
           y: [0, -2, 0],
-          borderColor: [mood.color + '60', mood.color + '90', mood.color + '60'],
+          boxShadow: [
+            `0 0 0 2px ${moodColor}40, 0 4px 16px rgba(0,0,0,0.4), 0 0 8px ${moodColor}15`,
+            `0 0 0 2px ${moodColor}70, 0 4px 16px rgba(0,0,0,0.4), 0 0 16px ${moodColor}30`,
+            `0 0 0 2px ${moodColor}40, 0 4px 16px rgba(0,0,0,0.4), 0 0 8px ${moodColor}15`,
+          ],
         }}
-        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
       >
         <span className="text-lg">{MINI_SPRITES[species] || '🟢'}</span>
 
         {/* Mood indicator */}
         <motion.span
-          className="absolute -top-1 -right-1 text-[10px]"
-          animate={{ scale: [1, 1.2, 1] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
+          className="absolute -top-1 -right-1 text-[10px] bg-gray-900/80 rounded-full w-4 h-4 flex items-center justify-center"
+          style={{ boxShadow: `0 0 6px ${moodColor}40` }}
+          animate={{ scale: [1, 1.15, 1] }}
+          transition={{ duration: 2, repeat: Infinity }}
         >
           {mood.emoji}
         </motion.span>

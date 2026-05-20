@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="paw" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e0e7ff"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Background rounded square -->
+  <rect x="16" y="16" width="224" height="224" rx="48" ry="48" fill="url(#bg)"/>
+  <!-- Inner shadow -->
+  <rect x="16" y="16" width="224" height="224" rx="48" ry="48" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+  <!-- Paw print - main pad -->
+  <ellipse cx="128" cy="158" rx="32" ry="28" fill="url(#paw)" filter="url(#glow)"/>
+  <!-- Paw toes -->
+  <ellipse cx="96" cy="112" rx="16" ry="18" fill="url(#paw)" filter="url(#glow)"/>
+  <ellipse cx="128" cy="98" rx="16" ry="18" fill="url(#paw)" filter="url(#glow)"/>
+  <ellipse cx="160" cy="112" rx="16" ry="18" fill="url(#paw)" filter="url(#glow)"/>
+  <!-- Sparkle -->
+  <g fill="#fbbf24" opacity="0.9">
+    <polygon points="200,60 204,70 214,74 204,78 200,88 196,78 186,74 196,70" />
+    <polygon points="56,180 59,186 65,188 59,190 56,196 53,190 47,188 53,186" transform="scale(0.7) translate(30, 80)"/>
+  </g>
+</svg>

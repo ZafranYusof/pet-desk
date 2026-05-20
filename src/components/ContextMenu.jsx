@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const categoryColors = {
+  Care: { accent: '#22c55e', bg: 'from-green-900/40 to-green-950/20', border: 'border-green-500/20', glow: 'rgba(34,197,94,0.3)' },
+  Fun: { accent: '#a855f7', bg: 'from-purple-900/40 to-purple-950/20', border: 'border-purple-500/20', glow: 'rgba(168,85,247,0.3)' },
+  Social: { accent: '#3b82f6', bg: 'from-blue-900/40 to-blue-950/20', border: 'border-blue-500/20', glow: 'rgba(59,130,246,0.3)' },
+  Creative: { accent: '#ec4899', bg: 'from-pink-900/40 to-pink-950/20', border: 'border-pink-500/20', glow: 'rgba(236,72,153,0.3)' },
+  Life: { accent: '#f59e0b', bg: 'from-amber-900/40 to-amber-950/20', border: 'border-amber-500/20', glow: 'rgba(245,158,11,0.3)' },
+  Progress: { accent: '#06b6d4', bg: 'from-cyan-900/40 to-cyan-950/20', border: 'border-cyan-500/20', glow: 'rgba(6,182,212,0.3)' },
+  Tools: { accent: '#6b7280', bg: 'from-gray-800/40 to-gray-900/20', border: 'border-gray-500/20', glow: 'rgba(107,114,128,0.3)' },
+};
+
 const categories = [
   {
     label: 'Care',
@@ -86,11 +96,9 @@ const gameOptions = [
 function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
   const menuRef = useRef(null);
   const [showGames, setShowGames] = useState(false);
-  const [tooltip, setTooltip] = useState(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
-  // Disable click-through when mouse is over context menu
   const handleMouseEnter = () => {
     if (window.electronAPI?.setIgnoreMouse) window.electronAPI.setIgnoreMouse(false);
   };
@@ -108,7 +116,6 @@ function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Adjust position to stay on screen
   const [adjustedPos, setAdjustedPos] = useState({ x, y });
   useEffect(() => {
     if (menuRef.current) {
@@ -128,7 +135,7 @@ function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
     return (
       <motion.div
         ref={menuRef}
-        className="fixed z-50 min-w-[180px] bg-gray-900/90 backdrop-blur-xl rounded-2xl border border-gray-600/40 shadow-2xl shadow-black/50 overflow-hidden"
+        className="fixed z-50 min-w-[200px] bg-gray-900/95 backdrop-blur-2xl rounded-2xl border border-gray-600/30 shadow-2xl shadow-black/60 overflow-hidden"
         style={{ left: adjustedPos.x, top: adjustedPos.y }}
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -137,30 +144,34 @@ function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
         onMouseLeave={handleMouseLeave}
         transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
       >
-        <div className="p-2">
-          <button
-            className="w-full px-3 py-2 flex items-center gap-2 text-xs text-gray-400 hover:bg-gray-700/50 rounded-lg cursor-pointer transition-all"
+        <div className="p-2.5">
+          <motion.button
+            className="w-full px-3 py-2 flex items-center gap-2 text-xs text-gray-400 hover:bg-gray-700/50 rounded-xl cursor-pointer transition-all"
             onClick={() => setShowGames(false)}
+            whileHover={{ x: -2 }}
           >
             <span className="text-sm">←</span>
             <span>Back</span>
-          </button>
-          <div className="grid grid-cols-3 gap-1.5 mt-2">
-            {gameOptions.map((game) => (
+          </motion.button>
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            {gameOptions.map((game, i) => (
               <motion.button
                 key={game.id}
-                className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all ${
+                className={`flex flex-col items-center justify-center p-3 rounded-xl transition-all ${
                   gamesDisabled
                     ? 'text-gray-600 cursor-not-allowed opacity-40'
-                    : 'text-gray-200 hover:bg-gray-700/60 cursor-pointer hover:shadow-lg hover:shadow-purple-500/10'
+                    : 'text-gray-200 hover:bg-purple-500/20 cursor-pointer hover:shadow-lg hover:shadow-purple-500/10 border border-transparent hover:border-purple-500/30'
                 }`}
                 disabled={gamesDisabled}
                 onClick={() => onAction(`game:${game.id}`)}
-                whileHover={!gamesDisabled ? { scale: 1.08 } : {}}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                whileHover={!gamesDisabled ? { scale: 1.08, y: -2 } : {}}
                 whileTap={!gamesDisabled ? { scale: 0.92 } : {}}
               >
-                <span className="text-xl mb-0.5">{game.icon}</span>
-                <span className="text-[9px] leading-tight">{game.label}</span>
+                <span className="text-2xl mb-1">{game.icon}</span>
+                <span className="text-[10px] leading-tight font-medium">{game.label}</span>
               </motion.button>
             ))}
           </div>
@@ -172,7 +183,7 @@ function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
   return (
     <motion.div
       ref={menuRef}
-      className="fixed z-50 w-[280px] bg-gray-900/90 backdrop-blur-xl rounded-2xl border border-gray-600/40 shadow-2xl shadow-black/50 overflow-hidden"
+      className="fixed z-50 w-[290px] bg-gray-900/95 backdrop-blur-2xl rounded-2xl border border-gray-600/30 shadow-2xl shadow-black/60 overflow-hidden"
       style={{ left: adjustedPos.x, top: adjustedPos.y }}
       initial={{ opacity: 0, scale: 0.75, transformOrigin: 'top left' }}
       animate={{ opacity: 1, scale: 1 }}
@@ -181,54 +192,68 @@ function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <div className="p-2 max-h-[420px] overflow-y-auto custom-scrollbar">
-        {categories.map((cat, catIdx) => (
-          <div key={cat.label}>
-            {catIdx > 0 && <div className="h-px bg-gray-700/40 mx-2 my-1.5" />}
-            <div className="px-2 py-1">
-              <span className="text-[9px] uppercase tracking-wider text-gray-500 font-semibold">
-                {cat.label}
-              </span>
+      <div className="p-2 max-h-[440px] overflow-y-auto custom-scrollbar">
+        {categories.map((cat, catIdx) => {
+          const colors = categoryColors[cat.label] || categoryColors.Tools;
+          return (
+            <div key={cat.label}>
+              {catIdx > 0 && (
+                <div className="h-px mx-3 my-1.5 bg-gradient-to-r from-transparent via-gray-700/50 to-transparent" />
+              )}
+              <div className={`rounded-xl mx-1 mb-1 bg-gradient-to-r ${colors.bg} border ${colors.border} p-1.5`}>
+                <div className="px-2 py-0.5 mb-1 flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: colors.accent, boxShadow: `0 0 6px ${colors.glow}` }} />
+                  <span className="text-[9px] uppercase tracking-wider font-bold" style={{ color: colors.accent }}>
+                    {cat.label}
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  {cat.items.map((item, itemIdx) => {
+                    const disabled = item.disableCheck ? item.disableCheck(petState) : false;
+                    return (
+                      <motion.button
+                        key={item.id}
+                        className={`relative flex flex-col items-center justify-center p-1.5 rounded-xl transition-all group ${
+                          disabled
+                            ? 'text-gray-600 cursor-not-allowed opacity-40'
+                            : 'text-gray-200 hover:bg-white/10 cursor-pointer'
+                        }`}
+                        disabled={disabled}
+                        onClick={() => {
+                          if (item.id === 'games') {
+                            setShowGames(true);
+                          } else {
+                            onAction(item.id);
+                          }
+                        }}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: catIdx * 0.03 + itemIdx * 0.02 }}
+                        whileHover={!disabled ? { scale: 1.12, y: -3 } : {}}
+                        whileTap={!disabled ? { scale: 0.88 } : {}}
+                      >
+                        <span
+                          className={`text-lg transition-all duration-200 ${!disabled ? 'group-hover:scale-110' : ''}`}
+                          style={!disabled ? { filter: `drop-shadow(0 0 0px transparent)` } : {}}
+                          onMouseEnter={(e) => { if (!disabled) e.target.style.filter = `drop-shadow(0 0 8px ${colors.glow})`; }}
+                          onMouseLeave={(e) => { if (!disabled) e.target.style.filter = 'drop-shadow(0 0 0px transparent)'; }}
+                        >
+                          {item.icon}
+                        </span>
+                        <span className="text-[9px] leading-tight mt-0.5 text-center truncate w-full opacity-80 group-hover:opacity-100 transition-opacity">
+                          {item.label}
+                        </span>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-4 gap-1 px-1">
-              {cat.items.map((item) => {
-                const disabled = item.disableCheck ? item.disableCheck(petState) : false;
-                return (
-                  <motion.button
-                    key={item.id}
-                    className={`relative flex flex-col items-center justify-center p-1.5 rounded-xl transition-all group ${
-                      disabled
-                        ? 'text-gray-600 cursor-not-allowed opacity-40'
-                        : 'text-gray-200 hover:bg-gray-700/50 cursor-pointer'
-                    }`}
-                    disabled={disabled}
-                    onClick={() => {
-                      if (item.id === 'games') {
-                        setShowGames(true);
-                      } else {
-                        onAction(item.id);
-                      }
-                    }}
-                    onMouseEnter={() => setTooltip(item.label)}
-                    onMouseLeave={() => setTooltip(null)}
-                    whileHover={!disabled ? { scale: 1.1, y: -2 } : {}}
-                    whileTap={!disabled ? { scale: 0.9 } : {}}
-                  >
-                    <span className={`text-lg transition-all ${!disabled ? 'group-hover:drop-shadow-[0_0_6px_rgba(168,85,247,0.5)]' : ''}`}>
-                      {item.icon}
-                    </span>
-                    <span className="text-[9px] leading-tight mt-0.5 text-center truncate w-full">
-                      {item.label}
-                    </span>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* Bottom actions */}
-        <div className="h-px bg-gray-700/40 mx-2 my-1.5" />
+        <div className="h-px mx-3 my-1.5 bg-gradient-to-r from-transparent via-gray-700/50 to-transparent" />
         <div className="grid grid-cols-4 gap-1 px-1 pb-1">
           {[
             { id: 'seasonal', icon: '🎉', label: 'Events' },
@@ -238,7 +263,7 @@ function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
           ].map((item) => (
             <motion.button
               key={item.id}
-              className="flex flex-col items-center justify-center p-1.5 rounded-xl text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 cursor-pointer transition-all group"
+              className="flex flex-col items-center justify-center p-1.5 rounded-xl text-gray-400 hover:text-gray-200 hover:bg-white/5 cursor-pointer transition-all group"
               onClick={() => {
                 if (item.id === 'close') onClose();
                 else onAction(item.id);
@@ -247,7 +272,7 @@ function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
               whileTap={{ scale: 0.9 }}
             >
               <span className="text-lg group-hover:drop-shadow-[0_0_6px_rgba(168,85,247,0.4)]">{item.icon}</span>
-              <span className="text-[9px] leading-tight mt-0.5">{item.label}</span>
+              <span className="text-[9px] leading-tight mt-0.5 opacity-70 group-hover:opacity-100">{item.label}</span>
             </motion.button>
           ))}
         </div>

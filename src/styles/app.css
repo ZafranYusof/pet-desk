@@ -10,14 +10,7 @@ html, body, #root {
   background: transparent !important;
 }
 
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-2px); }
-  50% { transform: translateX(2px); }
-  75% { transform: translateX(-1px); }
-}
-
-/* Custom scrollbar */
+/* ===== Custom Scrollbar ===== */
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
@@ -32,7 +25,7 @@ html, body, #root {
   background: rgba(107, 114, 128, 0.7);
 }
 
-/* Global scrollbar for all overflow elements */
+/* Global scrollbar - thin, rounded, semi-transparent */
 *::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -41,18 +34,86 @@ html, body, #root {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(75, 85, 99, 0.4);
+  background: rgba(75, 85, 99, 0.35);
   border-radius: 9999px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(107, 114, 128, 0.6);
+  background: rgba(107, 114, 128, 0.55);
 }
 
-/* Pet interaction ripple */
+/* ===== Keyframe Animations ===== */
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  50% { transform: translateX(2px); }
+  75% { transform: translateX(-1px); }
+}
+
 @keyframes ripple {
   0% { transform: scale(0); opacity: 0.6; }
   100% { transform: scale(2.5); opacity: 0; }
 }
+
+@keyframes floatUp {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-60px) scale(0.5); opacity: 0; }
+}
+
+@keyframes levelFlash {
+  0% { opacity: 0; }
+  20% { opacity: 0.3; }
+  100% { opacity: 0; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes particleBurst {
+  0% { transform: scale(0) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1.5) rotate(180deg); opacity: 0; }
+}
+
+@keyframes loadShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(168, 85, 247, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.4); }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.02); opacity: 1; }
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(180deg); }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes ring-expand {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+/* ===== Utility Classes ===== */
+
 .pet-ripple {
   position: absolute;
   width: 40px;
@@ -63,11 +124,6 @@ html, body, #root {
   pointer-events: none;
 }
 
-/* Food float animation */
-@keyframes floatUp {
-  0% { transform: translateY(0) scale(1); opacity: 1; }
-  100% { transform: translateY(-60px) scale(0.5); opacity: 0; }
-}
 .food-float {
   position: absolute;
   animation: floatUp 1s ease-out forwards;
@@ -75,12 +131,6 @@ html, body, #root {
   font-size: 24px;
 }
 
-/* Level up flash */
-@keyframes levelFlash {
-  0% { opacity: 0; }
-  20% { opacity: 0.3; }
-  100% { opacity: 0; }
-}
 .level-flash {
   position: fixed;
   inset: 0;
@@ -90,35 +140,111 @@ html, body, #root {
   z-index: 100;
 }
 
-/* Achievement shimmer */
-@keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
-}
 .achievement-shimmer {
   background: linear-gradient(90deg, transparent 30%, rgba(251, 191, 36, 0.2) 50%, transparent 70%);
   background-size: 200% 100%;
   animation: shimmer 2s linear infinite;
 }
 
-/* Particle burst */
-@keyframes particleBurst {
-  0% { transform: scale(0) rotate(0deg); opacity: 1; }
-  100% { transform: scale(1.5) rotate(180deg); opacity: 0; }
-}
 .particle-burst {
   animation: particleBurst 0.8s ease-out forwards;
   pointer-events: none;
 }
 
-/* Loading shimmer for async content */
-@keyframes loadShimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
 .loading-shimmer {
   background: linear-gradient(90deg, rgba(55, 65, 81, 0.3) 25%, rgba(75, 85, 99, 0.5) 50%, rgba(55, 65, 81, 0.3) 75%);
   background-size: 200% 100%;
   animation: loadShimmer 1.5s infinite;
   border-radius: 8px;
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.breathe {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+.sparkle-anim {
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+.gradient-shift {
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+.float-anim {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* ===== Gradient Text Utilities ===== */
+
+.text-gradient-gold {
+  background: linear-gradient(to right, #fbbf24, #f59e0b, #fbbf24);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-purple {
+  background: linear-gradient(to right, #a855f7, #6366f1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-rainbow {
+  background: linear-gradient(to right, #f87171, #fbbf24, #34d399, #60a5fa, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ===== Glass Panel Base ===== */
+
+.glass-panel {
+  background: rgba(17, 24, 39, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+}
+
+/* ===== Button Hover States ===== */
+
+.btn-glow:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.3);
+}
+
+.btn-glow:active {
+  transform: scale(0.98);
+}
+
+/* ===== Close Button Consistent Style ===== */
+
+.close-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: rgba(156, 163, 175, 1);
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.1);
 }
