@@ -946,6 +946,23 @@ function AppContent() {
     }
   }, [anyPanelOpen]);
 
+  // When any panel is open, ensure ALL mouse events are captured (not just on panel element)
+  // This fixes buttons inside panels being unclickable
+  useEffect(() => {
+    if (!anyPanelOpen) return;
+    const keepAlive = () => {
+      if (window.electronAPI?.setIgnoreMouse) {
+        window.electronAPI.setIgnoreMouse(false);
+      }
+    };
+    document.addEventListener('mousemove', keepAlive);
+    document.addEventListener('mousedown', keepAlive);
+    return () => {
+      document.removeEventListener('mousemove', keepAlive);
+      document.removeEventListener('mousedown', keepAlive);
+    };
+  }, [anyPanelOpen]);
+
   // Re-enable ignore when mouse leaves pet (only if no panel open)
   useEffect(() => {
     const handler = () => {
