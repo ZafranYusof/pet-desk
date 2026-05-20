@@ -1,6 +1,6 @@
 {
   "name": "pet-desk",
-  "version": "0.1.0",
+  "version": "0.7.0",
   "description": "Virtual desktop pet - a pixel art companion that lives on your screen",
   "main": "electron/main.js",
   "scripts": {
