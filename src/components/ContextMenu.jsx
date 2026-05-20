@@ -33,6 +33,10 @@ const menuItems = [
   { id: 'sound', icon: '🔊', label: 'Sound' },
   { id: 'leaderboard', icon: '🏅', label: 'Leaderboard' },
   { id: 'lifetimeStats', icon: '📈', label: 'Stats' },
+  { id: 'activityLog', icon: '📋', label: 'Activity Log' },
+  { id: 'keybinds', icon: '⌨️', label: 'Keybinds' },
+  { id: 'palette', icon: '🎨', label: 'Colors' },
+  { id: 'seasonal', icon: '🎉', label: 'Events' },
   { id: 'rename', icon: '✏️', label: 'Rename' },
   { id: 'close', icon: '❌', label: 'Close' },
 ];
