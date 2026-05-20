@@ -73,6 +73,7 @@ import { getClipboardReaction, isClipboardEnabled } from './services/clipboardSe
 import TetrisPet from './games/TetrisPet';
 import RhythmPet from './games/RhythmPet';
 import PetRacing from './games/PetRacing';
+import MiniGame from './components/MiniGame';
 import { getDailyQuests, getWeeklyQuests, recordQuestProgress, getUnclaimedQuestCount } from './services/questService';
 import QuestBoard from './components/QuestBoard';
 import { addNotification, getUnreadCount } from './services/notificationCenterService';
@@ -846,7 +847,10 @@ function AppContent() {
         if (action && action.startsWith('game:')) {
           recordInteraction(); recordStatsInteraction('game');
           const gameId = action.split(':')[1];
-          if (gameId) recordStatsGame(gameId);
+          if (gameId) {
+            recordStatsGame(gameId);
+            setActiveGame(gameId);
+          }
           dailyStatsRef.current.gamesPlayed = (dailyStatsRef.current.gamesPlayed || 0) + 1;
           saveDailyStats(dailyStatsRef.current);
         }
@@ -877,7 +881,7 @@ function AppContent() {
       <SeasonalBanner onOpen={() => setShowSeasonalEvent(true)} />
 
       {/* Pet with full desktop roaming */}
-      <div className={`pet-sprite-animated ${petSpriteClass} ${edgeReaction ? `pet-edge-${edgeReaction.reaction === 'sit' ? 'sit' : edgeReaction.reaction === 'lean' ? (edgeReaction.edge === 'left' ? 'lean-left' : 'lean-right') : 'look-up'}` : ''}`} style={{ filter: paletteFilter !== 'none' ? paletteFilter : undefined }}>
+      <div className={`pet-sprite-animated ${petSpriteClass} ${edgeReaction ? `pet-edge-${edgeReaction.reaction === 'sit' ? 'sit' : edgeReaction.reaction === 'lean' ? (edgeReaction.edge === 'left' ? 'lean-left' : 'lean-right') : 'look-up'}` : ''}`} style={{ filter: paletteFilter !== 'none' ? paletteFilter : undefined, transform: `scale(${getAgeScaleFactor()})`, transformOrigin: 'bottom center' }}>
         <Pet
           petState={petState.state || 'idle'}
           species={petState.species || 'slime'}
@@ -1186,6 +1190,29 @@ function AppContent() {
           <SeasonalEvent petState={petState} onClaimReward={(reward) => {
             setPetState((prev) => { const updated = { ...prev }; updated.xp = (updated.xp || 0) + (reward.xpBonus || 0); updated.level = calculateLevel(updated.xp); if (reward.accessories) { reward.accessories.forEach((accId) => { if (!updated.unlockedAccessories?.includes(accId)) { updated.unlockedAccessories = [...(updated.unlockedAccessories || []), accId]; } }); } return updated; });
           }} onClose={() => setShowSeasonalEvent(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Mini Games (CatchFood, MemoryMatch, QuickTap from context menu) */}
+      <AnimatePresence>
+        {(activeGame === 'catchFood' || activeGame === 'memoryMatch' || activeGame === 'quickTap') && (
+          <MiniGame
+            gameId={activeGame}
+            onClose={() => setActiveGame(null)}
+            onComplete={(xp) => {
+              setActiveGame(null);
+              if (xp > 0) {
+                setPetState((prev) => {
+                  const updated = { ...prev };
+                  updated.xp = (updated.xp || 0) + xp;
+                  updated.level = calculateLevel(updated.xp);
+                  return updated;
+                });
+              }
+              recordQuestProgress('game');
+              recordMemoryEvent('game', { game: activeGame });
+            }}
+          />
         )}
       </AnimatePresence>
 
