@@ -1018,7 +1018,7 @@ function AppContent() {
       {/* Pet Chat Bubble */}
       <AnimatePresence>
         {chatBubble && (
-          <ChatBubble message={chatBubble} species={petState.species || 'slime'} onDismiss={() => setChatBubble(null)} />
+          <ChatBubble message={chatBubble} species={petState.species || 'slime'} onDismiss={() => setChatBubble(null)} petPosition={primaryPosition} />
         )}
       </AnimatePresence>
 

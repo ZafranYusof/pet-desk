@@ -18,11 +18,13 @@ const bubbleColors = {
 /**
  * Chat bubble that appears above the pet with typewriter effect.
  */
-function ChatBubble({ message, species, onDismiss }) {
+function ChatBubble({ message, species, onDismiss, petPosition }) {
   const [displayText, setDisplayText] = useState('');
   const [complete, setComplete] = useState(false);
   const timerRef = useRef(null);
   const dismissRef = useRef(null);
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
 
   const colorClass = bubbleColors[species] || 'border-gray-500/40 bg-gray-900/90';
 
@@ -51,19 +53,26 @@ function ChatBubble({ message, species, onDismiss }) {
   useEffect(() => {
     if (complete) {
       dismissRef.current = setTimeout(() => {
-        onDismiss();
+        onDismissRef.current();
       }, 5000);
     }
     return () => {
       if (dismissRef.current) clearTimeout(dismissRef.current);
     };
-  }, [complete, onDismiss]);
+  }, [complete]);
 
   if (!message) return null;
 
   return (
     <motion.div
-      className={`absolute -top-16 left-1/2 -translate-x-1/2 max-w-[180px] px-3 py-2 rounded-xl border backdrop-blur-sm cursor-pointer z-40 ${colorClass}`}
+      style={{
+        position: 'fixed',
+        left: petPosition ? petPosition.x + 20 : '50%',
+        top: petPosition ? petPosition.y - 60 : 100,
+        zIndex: 40,
+        maxWidth: 200,
+      }}
+      className={`px-3 py-2 rounded-xl border backdrop-blur-sm cursor-pointer ${colorClass}`}
       initial={{ opacity: 0, y: 10, scale: 0.8 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -10, scale: 0.8 }}
@@ -128,7 +137,7 @@ function ChatLog({ species, petName, onClose }) {
             onClick={onClose}
             className="text-gray-400 hover:text-white text-lg leading-none cursor-pointer"
           >
-            ×
+            ï¿½
           </button>
         </div>
 
