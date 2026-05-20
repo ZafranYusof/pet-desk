@@ -121,6 +121,22 @@ import { startFileAwareness, stopFileAwareness, getFileInsight } from './service
 import { startClipboardMonitor, stopClipboardMonitor, getClipboardReaction as getSmartClipboardReaction, detectContentType } from './services/clipboardIntelligenceService';
 import PetKnowledge from './components/PetKnowledge';
 
+// Feature imports: Voice, Desktop Toys, Screen Doodle, Reminders
+import { autoSpeak } from './services/voiceService';
+import VoiceSettings from './components/VoiceSettings';
+import { recordChatDismiss, recordTalkInteraction } from './services/personalityEvolution';
+import { getDesktopToysSettings, calculateChaseTarget, shouldApproach, detectFastMovement, getCursorPlayAction, getLookDirection } from './services/desktopToysService';
+import ScreenDoodle from './components/ScreenDoodle';
+import { checkDueReminders, checkPatternReminders, recordAppPattern } from './services/reminderService';
+import ReminderPanel from './components/ReminderPanel';
+import CodeCompanion from './components/CodeCompanion';
+import SkinSelector from './components/SkinSelector';
+import DesktopWidgets from './components/DesktopWidgets';
+import WidgetManager from './components/WidgetManager';
+import AmbientBackground from './components/AmbientBackground';
+import { getCurrentSkin } from './services/skinService';
+import { toggleAmbient } from './services/ambientBackgroundService';
+
 // Daily stats storage key
 const DAILY_STATS_KEY = 'petdesk_daily_stats';
 
@@ -229,6 +245,20 @@ function AppContent() {
     try { return localStorage.getItem('petdesk_mini_pet_visible') === 'true'; } catch { return false; }
   });
   const [currentMood, setCurrentMood] = useState(() => getMoodState().currentMood);
+
+  // New feature states: Voice, Desktop Toys, Screen Doodle, Reminders
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+  const [showReminders, setShowReminders] = useState(false);
+  const [showCodeCompanion, setShowCodeCompanion] = useState(false);
+  const [showSkinSelector, setShowSkinSelector] = useState(false);
+  const [showWidgetManager, setShowWidgetManager] = useState(false);
+  const [currentSkin, setCurrentSkin] = useState(() => getCurrentSkin());
+  const [doodleActive, setDoodleActive] = useState(false);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [chaseMode, setChaseMode] = useState(false);
+  const mouseStillTimerRef = useRef(null);
+  const mousePositionsRef = useRef([]);
+  const lastMouseMoveRef = useRef(Date.now());
 
   // Activity monitoring state
   const [currentActivityState, setCurrentActivityState] = useState(null);
@@ -440,6 +470,7 @@ function AppContent() {
       chatTimerRef.current = setTimeout(async () => {
         const aiSettings = getAISettings();
         const currentPetState = petStateRef.current;
+        let msg = null;
         if (aiSettings.useAIForAutoChat) {
           try {
             const petContext = {
@@ -458,15 +489,17 @@ function AppContent() {
               category: activity.category,
               durationMinutes: activity.durationMinutes || 0,
             } : undefined;
-            const msg = await generateIdleChat(petContext, activityCtx);
-            if (msg) { setChatBubble(msg); saveChatMessage(msg); }
+            msg = await generateIdleChat(petContext, activityCtx);
           } catch (e) {
-            const msg = getIdleChat(currentPetState);
-            if (msg) { setChatBubble(msg); saveChatMessage(msg); }
+            msg = getIdleChat(currentPetState);
           }
         } else {
-          const msg = getIdleChat(currentPetState);
-          if (msg) { setChatBubble(msg); saveChatMessage(msg); }
+          msg = getIdleChat(currentPetState);
+        }
+        if (msg) {
+          setChatBubble(msg);
+          saveChatMessage(msg);
+          autoSpeak(msg);
         }
         scheduleChatMessage();
       }, delay);
@@ -483,7 +516,7 @@ function AppContent() {
     else if (hour >= 18 && hour < 22) timeOfDayStr = 'evening';
     else if (hour >= 22 || hour < 6) timeOfDayStr = 'night';
     const greeting = getGreeting(petState, timeOfDayStr);
-    if (greeting) { setTimeout(() => { setChatBubble(greeting); saveChatMessage(greeting); }, 2000); }
+    if (greeting) { setTimeout(() => { setChatBubble(greeting); saveChatMessage(greeting); autoSpeak(greeting); }, 2000); }
   }, []);
 
   // Ensure pet state has new fields (migration)
@@ -841,6 +874,78 @@ function AppContent() {
     return () => stopAmbientMusic();
   }, [activeHabitat]);
 
+  // === Mouse tracking for Desktop Toys (Feature 3) ===
+  useEffect(() => {
+    const settings = getDesktopToysSettings();
+    if (!settings.chaseMouse) return;
+
+    function handleMouseMove(e) {
+      const pos = { x: e.clientX, y: e.clientY, t: Date.now() };
+      setMousePosition({ x: e.clientX, y: e.clientY });
+      lastMouseMoveRef.current = Date.now();
+
+      // Track recent positions for speed detection
+      mousePositionsRef.current.push(pos);
+      if (mousePositionsRef.current.length > 10) mousePositionsRef.current.shift();
+    }
+
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => document.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  // Chase mode: pet approaches cursor when still for 3s
+  useEffect(() => {
+    const settings = getDesktopToysSettings();
+    if (!settings.chaseMouse) return;
+
+    const interval = setInterval(() => {
+      const stillDuration = Date.now() - lastMouseMoveRef.current;
+      if (stillDuration > 3000) {
+        setChaseMode(true);
+      } else {
+        setChaseMode(false);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // === Random doodle trigger (Feature 4) ===
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // 0.5% chance every 30 seconds = roughly once per 100 minutes
+      if (Math.random() < 0.005 && !doodleActive) {
+        setDoodleActive(true);
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [doodleActive]);
+
+  // === Smart Reminders check every 60 seconds (Feature 5) ===
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Check user-set reminders
+      const dueReminders = checkDueReminders();
+      if (dueReminders.length > 0) {
+        const reminder = dueReminders[0];
+        const msg = `⏰ ${reminder.message}`;
+        setChatBubble(msg);
+        saveChatMessage(msg);
+        autoSpeak(msg);
+      }
+
+      // Check pattern-based reminders (lower priority)
+      if (dueReminders.length === 0) {
+        const patternMsg = checkPatternReminders();
+        if (patternMsg) {
+          setChatBubble(patternMsg);
+          saveChatMessage(patternMsg);
+        }
+      }
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Onboarding check on mount
   useEffect(() => {
     if (shouldShowOnboarding()) {
@@ -1074,9 +1179,16 @@ function AppContent() {
       case 'decorate': setShowHomeDecorator((prev) => !prev); break;
       case 'skills': setShowSkillTree((prev) => !prev); break;
       case 'importExport': setShowImportExport((prev) => !prev); break;
-      case 'aichat': setShowAIChat((prev) => !prev); break;
+      case 'aichat': setShowAIChat((prev) => { if (!prev) recordTalkInteraction(); return !prev; }); break;
       case 'aisettings': setShowAISettings((prev) => !prev); break;
       case 'knowledge': setShowPetKnowledge((prev) => !prev); break;
+      case 'voice': setShowVoiceSettings((prev) => !prev); break;
+      case 'reminders': setShowReminders((prev) => !prev); break;
+      case 'toggleCodeCompanion': setShowCodeCompanion((prev) => !prev); break;
+      case 'toggleSkinSelector': setShowSkinSelector((prev) => !prev); break;
+      case 'toggleWidgetManager': setShowWidgetManager((prev) => !prev); break;
+      case 'toggleAmbientBackground': toggleAmbient(); break;
+      case 'doodle': setDoodleActive(true); break;
       case 'miniPet': {
         const newVal = !showMiniPetRef.current;
         setShowMiniPet(newVal);
@@ -1107,7 +1219,7 @@ function AppContent() {
   const noopBounce = useCallback(() => {}, []);
 
   // Global mouse event toggle: disable click-through when any panel/modal is open
-  const anyPanelOpen = showStats || showPetSelector || showAccessoryShop || showDiary || showAchievements || showScrapbook || showDailyReward || showWidget || showSpriteEditor || showFoodMenu || showBirthday || showSoundSettings || showStatsDashboard || showBattle || showDungeon || showPhotoMode || showHabitatSelector || showStory || showGarden || showJobBoard || showArcade || showPetRoom || showCrafting || showBreedingLab || showChatLog || showLeaderboard || showActivityLog || showKeybindSettings || showColorPalette || showSeasonalEvent || showDreamSequence || showDreamLog || showPomodoro || showQuestBoard || showNotificationCenter || showOnboarding || showPetSlots || showEvolutionTree || showHomeDecorator || showSkillTree || showImportExport || showAIChat || showAISettings || showPetKnowledge || contextMenu !== null || activeGame !== null || activeWeatherEvent !== null;
+  const anyPanelOpen = showStats || showPetSelector || showAccessoryShop || showDiary || showAchievements || showScrapbook || showDailyReward || showWidget || showSpriteEditor || showFoodMenu || showBirthday || showSoundSettings || showStatsDashboard || showBattle || showDungeon || showPhotoMode || showHabitatSelector || showStory || showGarden || showJobBoard || showArcade || showPetRoom || showCrafting || showBreedingLab || showChatLog || showLeaderboard || showActivityLog || showKeybindSettings || showColorPalette || showSeasonalEvent || showDreamSequence || showDreamLog || showPomodoro || showQuestBoard || showNotificationCenter || showOnboarding || showPetSlots || showEvolutionTree || showHomeDecorator || showSkillTree || showImportExport || showAIChat || showAISettings || showPetKnowledge || showVoiceSettings || showReminders || showCodeCompanion || showSkinSelector || showWidgetManager || contextMenu !== null || activeGame !== null || activeWeatherEvent !== null;
 
   // Use layoutEffect for synchronous mouse toggle (no frame delay)
   // This is the SINGLE source of truth for ignore mouse state
@@ -1199,7 +1311,7 @@ function AppContent() {
       {/* Pet Chat Bubble */}
       <AnimatePresence>
         {chatBubble && (
-          <ChatBubble message={chatBubble} species={petState.species || 'slime'} mood={petState.mood} onDismiss={() => setChatBubble(null)} petPosition={primaryPosition} />
+          <ChatBubble message={chatBubble} species={petState.species || 'slime'} mood={petState.mood} onDismiss={() => { setChatBubble(null); recordChatDismiss(); }} petPosition={primaryPosition} />
         )}
       </AnimatePresence>
 
@@ -1634,6 +1746,60 @@ function AppContent() {
           <PetKnowledge onClose={() => setShowPetKnowledge(false)} />
         )}
       </AnimatePresence>
+
+      {/* Voice Settings (Feature 1) */}
+      <AnimatePresence>
+        {showVoiceSettings && (
+          <VoiceSettings onClose={() => setShowVoiceSettings(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Screen Doodle (Feature 4) */}
+      <ScreenDoodle
+        active={doodleActive}
+        mood={currentMood || 'neutral'}
+        onComplete={() => setDoodleActive(false)}
+      />
+
+      {/* Reminder Panel (Feature 5) */}
+      <AnimatePresence>
+        {showReminders && (
+          <ReminderPanel onClose={() => setShowReminders(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Code Companion */}
+      <AnimatePresence>
+        {showCodeCompanion && (
+          <CodeCompanion
+            onClose={() => setShowCodeCompanion(false)}
+            onOpenAIChat={() => { setShowCodeCompanion(false); setShowAIChat(true); }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Skin Selector */}
+      <AnimatePresence>
+        {showSkinSelector && (
+          <SkinSelector
+            onClose={() => setShowSkinSelector(false)}
+            onSkinChange={(skin) => setCurrentSkin(skin)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Widget Manager */}
+      <AnimatePresence>
+        {showWidgetManager && (
+          <WidgetManager onClose={() => setShowWidgetManager(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Desktop Widgets (always mounted, self-manages) */}
+      <DesktopWidgets />
+
+      {/* Ambient Background */}
+      <AmbientBackground />
 
       {/* Mini Pet Companion */}
       <MiniPet

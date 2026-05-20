@@ -8,6 +8,7 @@ import { getContextSummary } from './petContextService';
 import { getPatternSummary, getInsight } from './activityLearningService';
 import { getFileAwarenessSummary } from './fileAwarenessService';
 import { getClipboardSummary } from './clipboardIntelligenceService';
+import { getPersonalityForPrompt } from './personalityEvolution';
 
 const AI_SETTINGS_KEY = 'petdesk-ai-settings';
 const AI_CHAT_HISTORY_KEY = 'petdesk-ai-chat-history';
@@ -104,7 +105,15 @@ function buildSystemPrompt(petContext, activityContext) {
     prompt += `\n\n${clipboardInfo}`;
   }
 
-  prompt += `\n\nBe helpful, suggest things based on context. Keep responses short (1-2 sentences). Be cute and playful. Match your mood. Use occasional emoji (1 max per message).`;
+  // Include personality traits
+  let personalityInfo = '';
+  try { personalityInfo = getPersonalityForPrompt().summary; } catch (e) { /* ignore */ }
+  if (personalityInfo) {
+    prompt += `\n\nYour evolved personality: ${personalityInfo}`;
+    prompt += `\nRespond in character based on your personality traits. If sarcastic, be witty and dry. If affectionate, be warm and clingy. If playful, be energetic. If philosophical, be thoughtful. If foodie, mention food often.`;
+  }
+
+  prompt += `\n\nBe helpful, suggest things based on context. Keep responses short (1-2 sentences). Match your personality and mood. Use occasional emoji (1 max per message).`;
   return prompt;
 }
 

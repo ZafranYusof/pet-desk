@@ -28,6 +28,7 @@ const categories = [
       { id: 'arcade', icon: '👾', label: 'Arcade' },
       { id: 'battle', icon: '⚔️', label: 'Battle', disableCheck: (s) => s?.energy < 10 },
       { id: 'dungeon', icon: '🏰', label: 'Dungeon', disableCheck: (s) => s?.energy < 20 },
+      { id: 'doodle', icon: '✏️', label: 'Doodle' },
     ],
   },
   {
@@ -57,6 +58,7 @@ const categories = [
       { id: 'room', icon: '🏠', label: 'Room' },
       { id: 'decorate', icon: '🪑', label: 'Decor' },
       { id: 'habitat', icon: '🏡', label: 'Habitat' },
+      { id: 'reminders', icon: '⏰', label: 'Remind' },
     ],
   },
   {
@@ -80,10 +82,15 @@ const categories = [
       { id: 'miniPet', icon: '🐾', label: 'Mini' },
       { id: 'keybinds', icon: '⌨️', label: 'Keys' },
       { id: 'sound', icon: '🔊', label: 'Sound' },
+      { id: 'voice', icon: '🗣️', label: 'Voice' },
       { id: 'notifications', icon: '🔔', label: 'Inbox' },
       { id: 'activityLog', icon: '📋', label: 'Log' },
       { id: 'widget', icon: '📊', label: 'Widget' },
       { id: 'aisettings', icon: '⚙️🤖', label: 'AI' },
+      { id: 'toggleCodeCompanion', icon: '💻', label: 'Code' },
+      { id: 'toggleSkinSelector', icon: '🎨', label: 'Skins' },
+      { id: 'toggleWidgetManager', icon: '🧩', label: 'Widgets' },
+      { id: 'toggleAmbientBackground', icon: '🌅', label: 'Ambient' },
     ],
   },
 ];
