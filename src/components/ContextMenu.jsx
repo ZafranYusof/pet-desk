@@ -74,6 +74,7 @@ const categories = [
   {
     label: 'Tools',
     items: [
+      { id: 'knowledge', icon: '🧠', label: 'Brain' },
       { id: 'pomodoro', icon: '🍅', label: 'Focus' },
       { id: 'importExport', icon: '📦', label: 'Backup' },
       { id: 'miniPet', icon: '🐾', label: 'Mini' },

@@ -1,7 +1,13 @@
 /**
  * PetDesk - AI Chat Service
  * OpenAI-compatible API client for AI-powered pet chat.
+ * Enhanced with full desktop awareness context.
  */
+
+import { getContextSummary } from './petContextService';
+import { getPatternSummary, getInsight } from './activityLearningService';
+import { getFileAwarenessSummary } from './fileAwarenessService';
+import { getClipboardSummary } from './clipboardIntelligenceService';
 
 const AI_SETTINGS_KEY = 'petdesk-ai-settings';
 const AI_CHAT_HISTORY_KEY = 'petdesk-ai-chat-history';
@@ -46,17 +52,59 @@ export function saveAISettings(settings) {
 }
 
 /**
- * Build system prompt based on pet context.
+ * Build system prompt based on pet context with full desktop awareness.
  */
 function buildSystemPrompt(petContext, activityContext) {
   const { species, name, level, mood, happiness, energy } = petContext;
-  let prompt = `You are a virtual desktop pet. Your species is ${species || 'slime'}. Your name is ${name || 'Pet'}. You are level ${level || 1}. Your current mood is ${mood || 'neutral'}. Your happiness is ${happiness || 50}/100 and energy is ${energy || 50}/100.`;
 
-  if (activityContext) {
-    prompt += `\n\nThe user is currently using ${activityContext.processName || 'unknown app'} (${activityContext.category || 'unknown'}). Window title: "${activityContext.windowTitle || ''}". They've been doing this for ${activityContext.durationMinutes || 0} minutes.`;
+  // Gather all context sources
+  let contextSummary = '';
+  let patternSummary = '';
+  let fileAwareness = '';
+  let clipboardInfo = '';
+
+  try { contextSummary = getContextSummary(); } catch (e) { /* ignore */ }
+  try { patternSummary = getPatternSummary(); } catch (e) { /* ignore */ }
+  try { fileAwareness = getFileAwarenessSummary(); } catch (e) { /* ignore */ }
+  try { clipboardInfo = getClipboardSummary(); } catch (e) { /* ignore */ }
+
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dayStr = now.toLocaleDateString([], { weekday: 'long' });
+
+  let prompt = `You are a virtual desktop pet assistant. Here's what you know about your owner:
+- Species: ${species || 'slime'}, Name: ${name || 'Pet'}, Level: ${level || 1}
+- Current mood: ${mood || 'neutral'}, Happiness: ${happiness || 50}/100, Energy: ${energy || 50}/100
+- Time: ${timeStr} (${dayStr})`;
+
+  if (contextSummary) {
+    prompt += `\n\nOwner context:\n${contextSummary}`;
   }
 
-  prompt += `\n\nRespond in 1-2 short sentences. Be cute, playful, and match your mood. If tired, be sleepy. If happy, be energetic. If hungry, mention food. Keep responses under 30 words. Use occasional emoji (1 max per message).`;
+  if (activityContext) {
+    prompt += `\n\nCurrent activity: ${activityContext.processName || 'unknown app'} (${activityContext.category || 'unknown'}). Window: "${activityContext.windowTitle || ''}". Duration: ${activityContext.durationMinutes || 0} min.`;
+  }
+
+  if (patternSummary && patternSummary !== 'Not enough data yet') {
+    prompt += `\n\nActivity patterns: ${patternSummary}`;
+  }
+
+  // Get insight for this time
+  let insight = '';
+  try { insight = getInsight(); } catch (e) { /* ignore */ }
+  if (insight) {
+    prompt += `\nPattern insight: ${insight}`;
+  }
+
+  if (fileAwareness && fileAwareness !== 'No file data yet') {
+    prompt += `\n\nFile awareness:\n${fileAwareness}`;
+  }
+
+  if (clipboardInfo && clipboardInfo !== 'No recent clipboard content') {
+    prompt += `\n\n${clipboardInfo}`;
+  }
+
+  prompt += `\n\nBe helpful, suggest things based on context. Keep responses short (1-2 sentences). Be cute and playful. Match your mood. Use occasional emoji (1 max per message).`;
   return prompt;
 }
 

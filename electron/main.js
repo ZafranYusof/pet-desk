@@ -125,6 +125,153 @@ ipcMain.handle('get-screen-size', () => {
   return { width, height };
 });
 
+// File awareness IPC handlers
+ipcMain.handle('scan-desktop', async () => {
+  const fs = require('fs');
+  const os = require('os');
+  const desktopPath = path.join(os.homedir(), 'Desktop');
+  // Also check OneDrive desktop
+  const oneDriveDesktop = path.join(os.homedir(), 'OneDrive', 'Desktop');
+  const results = [];
+
+  async function scanFolder(folderPath) {
+    try {
+      if (!fs.existsSync(folderPath)) return;
+      const entries = fs.readdirSync(folderPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.name.startsWith('.')) continue;
+        try {
+          const fullPath = path.join(folderPath, entry.name);
+          const stats = fs.statSync(fullPath);
+          results.push({
+            name: entry.name,
+            path: fullPath,
+            isDirectory: entry.isDirectory(),
+            size: stats.size,
+            modified: stats.mtimeMs,
+          });
+        } catch (e) { /* skip inaccessible files */ }
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  await scanFolder(desktopPath);
+  await scanFolder(oneDriveDesktop);
+  return results;
+});
+
+ipcMain.handle('scan-projects', async () => {
+  const fs = require('fs');
+  const os = require('os');
+  const results = [];
+
+  // Common project locations
+  const searchPaths = [
+    os.homedir(),
+    path.join(os.homedir(), 'Documents'),
+    path.join(os.homedir(), 'Projects'),
+    path.join(os.homedir(), 'repos'),
+    path.join(os.homedir(), 'dev'),
+    path.join(os.homedir(), 'Desktop'),
+    path.join(os.homedir(), 'OneDrive', 'Desktop'),
+  ];
+
+  const projectIndicators = ['package.json', '.git', 'pubspec.yaml', 'Cargo.toml', 'go.mod', 'pom.xml', 'requirements.txt', 'composer.json'];
+
+  function detectTechStack(dirPath) {
+    const stack = [];
+    try {
+      const files = fs.readdirSync(dirPath).map(f => f.toLowerCase());
+      if (files.includes('package.json')) stack.push('Node.js');
+      if (files.includes('tsconfig.json')) stack.push('TypeScript');
+      if (files.includes('vite.config.js') || files.includes('vite.config.ts')) stack.push('Vite');
+      if (files.includes('next.config.js') || files.includes('next.config.mjs')) stack.push('Next.js');
+      if (files.includes('pubspec.yaml')) stack.push('Flutter');
+      if (files.includes('cargo.toml')) stack.push('Rust');
+      if (files.includes('go.mod')) stack.push('Go');
+      if (files.includes('requirements.txt') || files.includes('setup.py')) stack.push('Python');
+      if (files.includes('tailwind.config.js')) stack.push('Tailwind');
+    } catch (e) { /* ignore */ }
+    return stack;
+  }
+
+  for (const searchPath of searchPaths) {
+    try {
+      if (!fs.existsSync(searchPath)) continue;
+      const entries = fs.readdirSync(searchPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+        const dirPath = path.join(searchPath, entry.name);
+        try {
+          const dirFiles = fs.readdirSync(dirPath);
+          const isProject = projectIndicators.some(indicator => dirFiles.includes(indicator));
+          if (isProject) {
+            const stats = fs.statSync(dirPath);
+            results.push({
+              name: entry.name,
+              path: dirPath,
+              lastModified: stats.mtimeMs,
+              techStack: detectTechStack(dirPath),
+            });
+          }
+        } catch (e) { /* skip inaccessible dirs */ }
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  // Deduplicate by path
+  const seen = new Set();
+  return results.filter(p => {
+    if (seen.has(p.path)) return false;
+    seen.add(p.path);
+    return true;
+  }).slice(0, 30);
+});
+
+ipcMain.handle('get-recent-files', async () => {
+  const fs = require('fs');
+  const os = require('os');
+  const results = [];
+  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+
+  const foldersToCheck = [
+    path.join(os.homedir(), 'Desktop'),
+    path.join(os.homedir(), 'Downloads'),
+    path.join(os.homedir(), 'Documents'),
+    path.join(os.homedir(), 'OneDrive', 'Desktop'),
+  ];
+
+  for (const folder of foldersToCheck) {
+    try {
+      if (!fs.existsSync(folder)) continue;
+      const entries = fs.readdirSync(folder, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.name.startsWith('.') || entry.isDirectory()) continue;
+        try {
+          const fullPath = path.join(folder, entry.name);
+          const stats = fs.statSync(fullPath);
+          if (stats.mtimeMs > oneDayAgo) {
+            results.push({
+              name: entry.name,
+              path: fullPath,
+              modified: stats.mtimeMs,
+              size: stats.size,
+            });
+          }
+        } catch (e) { /* skip */ }
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  // Sort by most recent
+  results.sort((a, b) => b.modified - a.modified);
+  return results.slice(0, 20);
+});
+
+ipcMain.handle('read-clipboard', async () => {
+  return clipboard.readText();
+});
+
 ipcMain.handle('get-system-idle', () => {
   return powerMonitor.getSystemIdleTime();
 });

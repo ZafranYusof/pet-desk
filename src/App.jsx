@@ -115,6 +115,11 @@ import AIChatPanel from './components/AIChatPanel';
 import AISettings from './components/AISettings';
 import { getAISettings, generateIdleChat, generateActivityComment } from './services/aiChatService';
 import { initActivityMonitor, getCurrentActivity, onActivityChange, isActivityMonitorEnabled, isUserIdle } from './services/activityMonitorService';
+import { getPetContext, trackCommonApp } from './services/petContextService';
+import { recordActivity, recordAppDuration, recordIdle, getInsight as getActivityInsight } from './services/activityLearningService';
+import { startFileAwareness, stopFileAwareness, getFileInsight } from './services/fileAwarenessService';
+import { startClipboardMonitor, stopClipboardMonitor, getClipboardReaction as getSmartClipboardReaction, detectContentType } from './services/clipboardIntelligenceService';
+import PetKnowledge from './components/PetKnowledge';
 
 // Daily stats storage key
 const DAILY_STATS_KEY = 'petdesk_daily_stats';
@@ -219,6 +224,7 @@ function AppContent() {
   const [showImportExport, setShowImportExport] = useState(false);
   const [showAIChat, setShowAIChat] = useState(false);
   const [showAISettings, setShowAISettings] = useState(false);
+  const [showPetKnowledge, setShowPetKnowledge] = useState(false);
   const [showMiniPet, setShowMiniPet] = useState(() => {
     try { return localStorage.getItem('petdesk_mini_pet_visible') === 'true'; } catch { return false; }
   });
@@ -696,11 +702,19 @@ function AppContent() {
     });
   }, []);
 
-  // Clipboard monitoring
+  // Clipboard monitoring with intelligence
   useEffect(() => {
     if (!window.electronAPI?.onClipboardChange) return;
     window.electronAPI.onClipboardChange((text) => {
       if (!isClipboardEnabled()) return;
+      // Try smart clipboard intelligence first
+      const smartReaction = getSmartClipboardReaction(text);
+      if (smartReaction) {
+        setChatBubble(smartReaction.message);
+        saveChatMessage(smartReaction.message);
+        return;
+      }
+      // Fallback to basic clipboard reaction
       const reaction = getClipboardReaction(text);
       if (reaction) {
         setChatBubble(reaction.text);
@@ -713,9 +727,25 @@ function AppContent() {
   useEffect(() => {
     initActivityMonitor();
 
+    // Start file awareness scanning
+    startFileAwareness();
+
+    // Start clipboard intelligence monitor
+    startClipboardMonitor((text, reaction) => {
+      // Clipboard intelligence reactions are handled separately below
+    });
+
     const unsubscribe = onActivityChange(async (activity) => {
       if (!isActivityMonitorEnabled()) return;
       setCurrentActivityState(activity);
+
+      // Record activity for learning
+      recordActivity(activity);
+
+      // Track common apps in pet context
+      if (activity.processName) {
+        trackCommonApp(activity.processName);
+      }
 
       // Throttle: minimum 3 minutes between activity comments
       const now = Date.now();
@@ -752,7 +782,11 @@ function AppContent() {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      stopFileAwareness();
+      stopClipboardMonitor();
+    };
   }, []);
 
   // Activity Monitor: idle detection (10+ minutes same window)
@@ -761,6 +795,9 @@ function AppContent() {
 
     const idleCheckInterval = setInterval(async () => {
       if (isUserIdle()) {
+        // Record idle for pattern learning
+        recordIdle();
+
         const now = Date.now();
         if (now - lastActivityCommentRef.current < ACTIVITY_COMMENT_COOLDOWN) return;
         lastActivityCommentRef.current = now;
@@ -1039,6 +1076,7 @@ function AppContent() {
       case 'importExport': setShowImportExport((prev) => !prev); break;
       case 'aichat': setShowAIChat((prev) => !prev); break;
       case 'aisettings': setShowAISettings((prev) => !prev); break;
+      case 'knowledge': setShowPetKnowledge((prev) => !prev); break;
       case 'miniPet': {
         const newVal = !showMiniPetRef.current;
         setShowMiniPet(newVal);
@@ -1069,7 +1107,7 @@ function AppContent() {
   const noopBounce = useCallback(() => {}, []);
 
   // Global mouse event toggle: disable click-through when any panel/modal is open
-  const anyPanelOpen = showStats || showPetSelector || showAccessoryShop || showDiary || showAchievements || showScrapbook || showDailyReward || showWidget || showSpriteEditor || showFoodMenu || showBirthday || showSoundSettings || showStatsDashboard || showBattle || showDungeon || showPhotoMode || showHabitatSelector || showStory || showGarden || showJobBoard || showArcade || showPetRoom || showCrafting || showBreedingLab || showChatLog || showLeaderboard || showActivityLog || showKeybindSettings || showColorPalette || showSeasonalEvent || showDreamSequence || showDreamLog || showPomodoro || showQuestBoard || showNotificationCenter || showOnboarding || showPetSlots || showEvolutionTree || showHomeDecorator || showSkillTree || showImportExport || showAIChat || showAISettings || contextMenu !== null || activeGame !== null || activeWeatherEvent !== null;
+  const anyPanelOpen = showStats || showPetSelector || showAccessoryShop || showDiary || showAchievements || showScrapbook || showDailyReward || showWidget || showSpriteEditor || showFoodMenu || showBirthday || showSoundSettings || showStatsDashboard || showBattle || showDungeon || showPhotoMode || showHabitatSelector || showStory || showGarden || showJobBoard || showArcade || showPetRoom || showCrafting || showBreedingLab || showChatLog || showLeaderboard || showActivityLog || showKeybindSettings || showColorPalette || showSeasonalEvent || showDreamSequence || showDreamLog || showPomodoro || showQuestBoard || showNotificationCenter || showOnboarding || showPetSlots || showEvolutionTree || showHomeDecorator || showSkillTree || showImportExport || showAIChat || showAISettings || showPetKnowledge || contextMenu !== null || activeGame !== null || activeWeatherEvent !== null;
 
   // Use layoutEffect for synchronous mouse toggle (no frame delay)
   // This is the SINGLE source of truth for ignore mouse state
@@ -1587,6 +1625,13 @@ function AppContent() {
       <AnimatePresence>
         {showAISettings && (
           <AISettings onClose={() => setShowAISettings(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Pet Knowledge Panel */}
+      <AnimatePresence>
+        {showPetKnowledge && (
+          <PetKnowledge onClose={() => setShowPetKnowledge(false)} />
         )}
       </AnimatePresence>
 

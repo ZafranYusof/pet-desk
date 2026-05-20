@@ -53,5 +53,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onActiveWindowChange: (callback) => {
     ipcRenderer.on('active-window-change', (event, data) => callback(data));
   },
+
+  // File awareness (desktop scanning)
+  scanDesktop: () => ipcRenderer.invoke('scan-desktop'),
+  scanProjects: () => ipcRenderer.invoke('scan-projects'),
+  getRecentFiles: () => ipcRenderer.invoke('get-recent-files'),
+  readClipboard: () => ipcRenderer.invoke('read-clipboard'),
 });
 
