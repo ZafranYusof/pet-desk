@@ -909,6 +909,7 @@ function AppContent() {
           equippedAccessories={petState.accessories || []}
           onPet={handlePetClick}
           onBounce={noopBounce}
+          onContextMenu={handleContextMenu}
           screenWidth={screenSize.width}
           screenHeight={screenSize.height}
           timeOfDay={timeOfDay}

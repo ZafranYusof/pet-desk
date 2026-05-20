@@ -45,7 +45,7 @@ const SPECIES_OFFSETS = {
   ghost: { hat: { x: 0, y: -3 }, glasses: { x: 0, y: 0 }, other: { x: 0, y: 2 } },
 };
 
-const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessories = [], onPet, onBounce, screenWidth = 1920, screenHeight = 1080, timeOfDay = 'afternoon', weather = 'sunny', triggerEmote = null, isCompanion = false, companionName = '', onPositionChange = null }) => {
+const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessories = [], onPet, onBounce, onContextMenu, screenWidth = 1920, screenHeight = 1080, timeOfDay = 'afternoon', weather = 'sunny', triggerEmote = null, isCompanion = false, companionName = '', onPositionChange = null }) => {
   const [frameIndex, setFrameIndex] = useState(0);
   const [position, setPosition] = useState(() => ({
     x: isCompanion
@@ -312,6 +312,13 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
     }
   }, [triggerEmote, addEmote]);
 
+  // Right-click context menu
+  const handleContextMenu = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onContextMenu) onContextMenu(e);
+  }, [onContextMenu]);
+
   // Click to pet with ripple effect
   const [ripples, setRipples] = useState([]);
   const handleClick = useCallback((e) => {
@@ -401,6 +408,7 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
         transformOrigin: 'bottom center',
       }}
       onClick={handleClick}
+      onContextMenu={handleContextMenu}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
