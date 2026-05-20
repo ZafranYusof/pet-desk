@@ -860,6 +860,15 @@ function AppContent() {
 
   const noopBounce = useCallback(() => {}, []);
 
+  // Global mouse event toggle: disable click-through when any panel/modal is open
+  const anyPanelOpen = showStats || showPetSelector || showAccessoryShop || showDiary || showAchievements || showScrapbook || showDailyReward || showWidget || showSpriteEditor || showFoodMenu || showBirthday || showSoundSettings || showStatsDashboard || showBattle || showDungeon || showPhotoMode || showHabitatSelector || showStory || showGarden || showJobBoard || showArcade || showPetRoom || showCrafting || showBreedingLab || showChatLog || showLeaderboard || showActivityLog || showKeybindSettings || showColorPalette || showSeasonalEvent || showDreamSequence || showDreamLog || showPomodoro || showQuestBoard || showNotificationCenter || showOnboarding || showPetSlots || contextMenu !== null || activeGame !== null;
+
+  useEffect(() => {
+    if (window.electronAPI?.setIgnoreMouse) {
+      window.electronAPI.setIgnoreMouse(!anyPanelOpen);
+    }
+  }, [anyPanelOpen]);
+
   // Get palette filter for pet sprite
   const paletteFilter = getPaletteFilter(colorPalette.id, colorPalette.customHue);
 
