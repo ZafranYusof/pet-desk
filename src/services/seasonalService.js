@@ -19,6 +19,7 @@ const SEASONAL_EVENTS = [
     bgColor: 'from-green-900/20 to-yellow-900/20',
     accessories: ['ketupat-charm'],
     banner: '🌙 Selamat Hari Raya! Bonus XP active!',
+    overlay: { type: 'accessory', sprite: '🧢', position: 'top', particle: 'stars', particleEmoji: '✨' },
   },
   {
     id: 'christmas',
@@ -33,6 +34,7 @@ const SEASONAL_EVENTS = [
     bgColor: 'from-red-900/20 to-green-900/20',
     accessories: ['santa-hat'],
     banner: '🎄 Merry Christmas! Double XP!',
+    overlay: { type: 'hat', sprite: '🎅', position: 'top', particle: 'snow', particleEmoji: '❄️' },
   },
   {
     id: 'halloween',
@@ -47,6 +49,7 @@ const SEASONAL_EVENTS = [
     bgColor: 'from-orange-900/20 to-purple-900/20',
     accessories: ['witch-hat'],
     banner: '🎃 Spooky Season! Bonus XP!',
+    overlay: { type: 'trail', sprite: '👻', position: 'behind', particle: 'fire', particleEmoji: '🔥' },
   },
   {
     id: 'newyear',
@@ -61,6 +64,7 @@ const SEASONAL_EVENTS = [
     bgColor: 'from-blue-900/20 to-purple-900/20',
     accessories: ['party-hat'],
     banner: '🎆 Happy New Year! Double XP!',
+    overlay: { type: 'hat', sprite: '🎉', position: 'top', particle: 'confetti', particleEmoji: '🎊' },
   },
   {
     id: 'valentine',
@@ -75,6 +79,7 @@ const SEASONAL_EVENTS = [
     bgColor: 'from-pink-900/20 to-red-900/20',
     accessories: ['heart-bow'],
     banner: "💝 Happy Valentine's! Love XP bonus!",
+    overlay: { type: 'trail', sprite: '💕', position: 'behind', particle: 'hearts', particleEmoji: '❤️' },
   },
 ];
 
@@ -176,6 +181,16 @@ export function claimSeasonalReward(eventId) {
 export function getSeasonalXpMultiplier() {
   const event = getActiveSeasonalEvent();
   return event ? event.xpMultiplier : 1.0;
+}
+
+/**
+ * Get seasonal overlay for pet rendering (cosmetic overlays during events)
+ * These are separate from equipped accessories - auto-applied during events.
+ */
+export function getSeasonalOverlay() {
+  const event = getActiveSeasonalEvent();
+  if (!event || !event.overlay) return null;
+  return event.overlay;
 }
 
 /**

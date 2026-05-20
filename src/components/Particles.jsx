@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 /**
  * Particle configuration per type.
+ * 12 particle types including new: leaves, petals, fireflies, dust motes, bubbles, embers
  */
 const PARTICLE_CONFIG = {
   sparkles: {
@@ -61,6 +62,60 @@ const PARTICLE_CONFIG = {
     duration: [1.2, 2.0],
     direction: 'up',
   },
+  // NEW particle types
+  leaves: {
+    count: [4, 7],
+    emoji: '🍃',
+    color: '#4CAF50',
+    size: [5, 8],
+    duration: [2.0, 3.5],
+    direction: 'down',
+    drift: true,
+  },
+  petals: {
+    count: [5, 8],
+    emoji: '🌸',
+    color: '#FFB7C5',
+    size: [5, 7],
+    duration: [2.5, 4.0],
+    direction: 'down',
+    drift: true,
+  },
+  fireflies: {
+    count: [4, 6],
+    emoji: null,
+    color: '#FFEB3B',
+    size: [3, 5],
+    duration: [2.0, 3.5],
+    direction: 'float',
+    glow: true,
+  },
+  dust: {
+    count: [6, 10],
+    emoji: null,
+    color: '#D4C5A9',
+    size: [2, 4],
+    duration: [3.0, 5.0],
+    direction: 'float',
+  },
+  bubbles: {
+    count: [4, 7],
+    emoji: null,
+    color: '#87CEEB',
+    size: [4, 8],
+    duration: [2.0, 3.5],
+    direction: 'up',
+    glow: true,
+  },
+  embers: {
+    count: [5, 8],
+    emoji: null,
+    color: '#FF6B35',
+    size: [2, 4],
+    duration: [1.5, 2.5],
+    direction: 'up',
+    glow: true,
+  },
 };
 
 function randomBetween(min, max) {
@@ -72,9 +127,17 @@ function generateParticle(config, index) {
   const duration = randomBetween(config.duration[0], config.duration[1]);
   const startX = randomBetween(-40, 40);
   const startY = randomBetween(-20, 20);
-  const driftX = randomBetween(-30, 30);
+  const driftX = config.drift ? randomBetween(-50, 50) : randomBetween(-30, 30);
 
-  const endY = config.direction === 'up' ? -60 - randomBetween(0, 40) : 60 + randomBetween(0, 40);
+  let endY;
+  if (config.direction === 'up') {
+    endY = -60 - randomBetween(0, 40);
+  } else if (config.direction === 'down') {
+    endY = 60 + randomBetween(0, 40);
+  } else {
+    // float - gentle random movement
+    endY = randomBetween(-30, 30);
+  }
 
   return {
     id: `${Date.now()}-${index}-${Math.random()}`,
@@ -86,11 +149,14 @@ function generateParticle(config, index) {
     endY,
     emoji: config.emoji,
     color: config.color,
+    glow: config.glow || false,
+    direction: config.direction,
   };
 }
 
 const Particle = ({ particle }) => {
   const isEmoji = !!particle.emoji;
+  const isFloat = particle.direction === 'float';
 
   return (
     <motion.div
@@ -101,14 +167,18 @@ const Particle = ({ particle }) => {
         scale: 0.5,
       }}
       animate={{
-        x: particle.startX + particle.driftX,
-        y: particle.startY + particle.endY,
-        opacity: 0,
-        scale: isEmoji ? 1.2 : 0.8,
+        x: isFloat
+          ? [particle.startX, particle.startX + particle.driftX, particle.startX + particle.driftX * 0.5]
+          : particle.startX + particle.driftX,
+        y: isFloat
+          ? [particle.startY, particle.startY + particle.endY, particle.startY + particle.endY * 0.7]
+          : particle.startY + particle.endY,
+        opacity: [0.9, 0.7, 0],
+        scale: isEmoji ? [0.5, 1.2, 0.8] : [0.5, 1.0, 0.3],
       }}
       transition={{
         duration: particle.duration,
-        ease: 'easeOut',
+        ease: isFloat ? 'easeInOut' : 'easeOut',
       }}
       style={{
         position: 'absolute',
@@ -121,6 +191,7 @@ const Particle = ({ particle }) => {
         fontSize: isEmoji ? `${particle.size}px` : undefined,
         pointerEvents: 'none',
         userSelect: 'none',
+        boxShadow: particle.glow ? `0 0 ${particle.size * 2}px ${particle.color}80` : undefined,
       }}
     >
       {isEmoji ? particle.emoji : null}
@@ -130,11 +201,14 @@ const Particle = ({ particle }) => {
 
 /**
  * Particle effect system.
- * @param {{ type: string, active: boolean, position?: { x: number, y: number } }} props
+ * Supports 12 particle types with habitat-specific ambient particles.
+ * Performance optimized: max 30 particles, recycle pool.
+ * @param {{ type: string, active: boolean, density?: number }} props
  */
-const Particles = ({ type = 'sparkles', active = false }) => {
+const Particles = ({ type = 'sparkles', active = false, density = 1.0 }) => {
   const [particles, setParticles] = useState([]);
   const intervalRef = useRef(null);
+  const MAX_PARTICLES = 30;
 
   useEffect(() => {
     if (!active) {
@@ -149,18 +223,28 @@ const Particles = ({ type = 'sparkles', active = false }) => {
     const config = PARTICLE_CONFIG[type];
     if (!config) return;
 
-    // Generate initial burst
-    const burstCount = Math.floor(randomBetween(config.count[0], config.count[1]));
+    // Generate initial burst (capped)
+    const burstCount = Math.min(
+      MAX_PARTICLES,
+      Math.floor(randomBetween(config.count[0], config.count[1]) * density)
+    );
     const initialParticles = Array.from({ length: burstCount }, (_, i) =>
       generateParticle(config, i)
     );
     setParticles(initialParticles);
 
     // Continuous emission for ongoing effects
-    const emitInterval = type === 'zzz' ? 2000 : type === 'raindrops' || type === 'snow' ? 800 : 1500;
+    const isFloat = config.direction === 'float';
+    const emitInterval = type === 'zzz' ? 2000
+      : (type === 'raindrops' || type === 'snow') ? 800
+      : isFloat ? 2000
+      : 1500;
 
     intervalRef.current = setInterval(() => {
-      const count = Math.floor(randomBetween(config.count[0], Math.min(config.count[1], config.count[0] + 2)));
+      const count = Math.min(
+        Math.floor(MAX_PARTICLES * density),
+        Math.floor(randomBetween(config.count[0], Math.min(config.count[1], config.count[0] + 2)) * density)
+      );
       const newParticles = Array.from({ length: count }, (_, i) =>
         generateParticle(config, i)
       );
@@ -173,7 +257,7 @@ const Particles = ({ type = 'sparkles', active = false }) => {
         intervalRef.current = null;
       }
     };
-  }, [type, active]);
+  }, [type, active, density]);
 
   // Clean up particles after their duration
   useEffect(() => {
@@ -210,3 +294,19 @@ const Particles = ({ type = 'sparkles', active = false }) => {
 };
 
 export default Particles;
+
+/**
+ * Get habitat-specific ambient particle type
+ */
+export function getHabitatParticleType(habitatId) {
+  switch (habitatId) {
+    case 'forest': return 'leaves';
+    case 'sakura': return 'petals';
+    case 'ocean': case 'underwater': return 'bubbles';
+    case 'space': case 'cosmic': return 'sparkles';
+    case 'cave': case 'volcano': return 'embers';
+    case 'meadow': case 'garden': return 'fireflies';
+    case 'desert': return 'dust';
+    default: return null;
+  }
+}

@@ -18,7 +18,7 @@ import { getWeather } from './services/weatherService';
 import { getPersonality, applyPersonalityToTick, shouldIgnoreClick } from './services/personality';
 import { generateEntry, saveDiaryEntry, hasEntryToday } from './services/diaryService';
 import { checkAndNotify, notifyLevelUp, recordInteraction } from './services/notificationService';
-import Particles from './components/Particles';
+import Particles, { getHabitatParticleType } from './components/Particles';
 import WeatherOverlay from './components/WeatherOverlay';
 import EvolutionAnimation from './components/EvolutionAnimation';
 import PetDiary from './components/PetDiary';
@@ -98,8 +98,19 @@ import { detectEdge, getEdgeTransform } from './services/screenEdgeService';
 import { loadPalette, getPaletteFilter } from './services/paletteService';
 import ColorPalette from './components/ColorPalette';
 import { PetProvider } from './context/PetContext';
-import { getActiveSeasonalEvent, getSeasonalXpMultiplier } from './services/seasonalService';
+import { getActiveSeasonalEvent, getSeasonalXpMultiplier, getSeasonalOverlay } from './services/seasonalService';
 import SeasonalEvent, { SeasonalBanner } from './components/SeasonalEvent';
+
+// New feature imports
+import EvolutionTree from './components/EvolutionTree';
+import HomeDecorator from './components/HomeDecorator';
+import { fetchRealWeather, getWeatherSettings, getCachedRealWeather } from './services/weatherService';
+import { tickMood, getMoodState, recordMoodInteraction, getMoodEffects, MOODS } from './services/moodService';
+import MiniPet from './components/MiniPet';
+import SkillTree from './components/SkillTree';
+import { awardSkillPoint } from './services/skillService';
+import ImportExport from './components/ImportExport';
+import { getDecorationBonuses } from './services/decorationService';
 
 // Daily stats storage key
 const DAILY_STATS_KEY = 'petdesk_daily_stats';
@@ -196,6 +207,16 @@ function AppContent() {
   const [showQuestBoard, setShowQuestBoard] = useState(false);
   const [showNotificationCenter, setShowNotificationCenter] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // New feature state
+  const [showEvolutionTree, setShowEvolutionTree] = useState(false);
+  const [showHomeDecorator, setShowHomeDecorator] = useState(false);
+  const [showSkillTree, setShowSkillTree] = useState(false);
+  const [showImportExport, setShowImportExport] = useState(false);
+  const [showMiniPet, setShowMiniPet] = useState(() => {
+    try { return localStorage.getItem('petdesk_mini_pet_visible') === 'true'; } catch { return false; }
+  });
+  const [currentMood, setCurrentMood] = useState(() => getMoodState().currentMood);
 
   // Multi-pet state
   const [petSlots, setPetSlots] = useState(() => getPetSlots());
@@ -345,6 +366,30 @@ function AppContent() {
     const interval = setInterval(() => { setWeather(getWeather()); }, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  // Real weather fetch on mount + every 30 minutes
+  useEffect(() => {
+    const settings = getWeatherSettings();
+    if (settings.useRealWeather) {
+      fetchRealWeather(settings.location).then(() => setWeather(getWeather()));
+    }
+    const interval = setInterval(() => {
+      const s = getWeatherSettings();
+      if (s.useRealWeather) {
+        fetchRealWeather(s.location).then(() => setWeather(getWeather()));
+      }
+    }, 30 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Mood system tick every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const moodState = tickMood(petState, weather, timeOfDay);
+      setCurrentMood(moodState.currentMood);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [weather, timeOfDay]);
 
   // Check for weather events every 30 minutes
   useEffect(() => {
@@ -657,6 +702,7 @@ function AppContent() {
       notifyLevelUp(updated.level);
       submitScore('level', updated.level);
       submitScore('totalXp', updated.xp || 0);
+      awardSkillPoint(); // Award skill point on level up
       const evoData = checkEvolutionOnLevelUp(updated, prev.level, updated.level);
       if (evoData) {
         setEvolutionAnimation({ oldSpriteKey: `${evoData.oldPrefix}_idle`, newSpriteKey: `${evoData.newPrefix}_idle`, name: evoData.name });
@@ -705,6 +751,7 @@ function AppContent() {
     setPetState((prev) => { const updated = pet(prev); checkLevelUp(prev, updated); return updated; });
     setTriggerEmote({ type: 'star', t: Date.now() });
     recordInteraction();
+    recordMoodInteraction();
     recordStatsInteraction('pet');
     recordPersonalityInteraction('pet');
     recordMemoryEvent('pet');
@@ -848,6 +895,16 @@ function AppContent() {
       case 'keybinds': setShowKeybindSettings((prev) => !prev); break;
       case 'palette': setShowColorPalette((prev) => !prev); break;
       case 'seasonal': setShowSeasonalEvent((prev) => !prev); break;
+      case 'evolution': setShowEvolutionTree((prev) => !prev); break;
+      case 'decorate': setShowHomeDecorator((prev) => !prev); break;
+      case 'skills': setShowSkillTree((prev) => !prev); break;
+      case 'importExport': setShowImportExport((prev) => !prev); break;
+      case 'miniPet': {
+        const newVal = !showMiniPet;
+        setShowMiniPet(newVal);
+        try { localStorage.setItem('petdesk_mini_pet_visible', String(newVal)); } catch {}
+        break;
+      }
       case 'summonCompanion': {
         const slots = getPetSlots();
         for (let i = 1; i < slots.length; i++) { if (slots[i]) { handleSummonCompanion(i); break; } }
@@ -872,7 +929,7 @@ function AppContent() {
   const noopBounce = useCallback(() => {}, []);
 
   // Global mouse event toggle: disable click-through when any panel/modal is open
-  const anyPanelOpen = showStats || showPetSelector || showAccessoryShop || showDiary || showAchievements || showScrapbook || showDailyReward || showWidget || showSpriteEditor || showFoodMenu || showBirthday || showSoundSettings || showStatsDashboard || showBattle || showDungeon || showPhotoMode || showHabitatSelector || showStory || showGarden || showJobBoard || showArcade || showPetRoom || showCrafting || showBreedingLab || showChatLog || showLeaderboard || showActivityLog || showKeybindSettings || showColorPalette || showSeasonalEvent || showDreamSequence || showDreamLog || showPomodoro || showQuestBoard || showNotificationCenter || showOnboarding || showPetSlots || contextMenu !== null || activeGame !== null;
+  const anyPanelOpen = showStats || showPetSelector || showAccessoryShop || showDiary || showAchievements || showScrapbook || showDailyReward || showWidget || showSpriteEditor || showFoodMenu || showBirthday || showSoundSettings || showStatsDashboard || showBattle || showDungeon || showPhotoMode || showHabitatSelector || showStory || showGarden || showJobBoard || showArcade || showPetRoom || showCrafting || showBreedingLab || showChatLog || showLeaderboard || showActivityLog || showKeybindSettings || showColorPalette || showSeasonalEvent || showDreamSequence || showDreamLog || showPomodoro || showQuestBoard || showNotificationCenter || showOnboarding || showPetSlots || showEvolutionTree || showHomeDecorator || showSkillTree || showImportExport || contextMenu !== null || activeGame !== null;
 
   useEffect(() => {
     if (window.electronAPI?.setIgnoreMouse) {
@@ -1310,6 +1367,45 @@ function AppContent() {
 
       {/* Onboarding */}
       {showOnboarding && (<Onboarding onComplete={() => setShowOnboarding(false)} />)}
+
+      {/* Evolution Tree */}
+      <AnimatePresence>
+        {showEvolutionTree && (<EvolutionTree petState={petState} onClose={() => setShowEvolutionTree(false)} />)}
+      </AnimatePresence>
+
+      {/* Home Decorator */}
+      <AnimatePresence>
+        {showHomeDecorator && (<HomeDecorator onClose={() => setShowHomeDecorator(false)} />)}
+      </AnimatePresence>
+
+      {/* Skill Tree */}
+      <AnimatePresence>
+        {showSkillTree && (<SkillTree onClose={() => setShowSkillTree(false)} />)}
+      </AnimatePresence>
+
+      {/* Import/Export */}
+      <AnimatePresence>
+        {showImportExport && (
+          <ImportExport
+            petState={petState}
+            onImport={(importedPet) => { setPetState((prev) => ({ ...prev, ...importedPet })); setShowImportExport(false); }}
+            onClose={() => setShowImportExport(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Mini Pet Companion */}
+      <MiniPet
+        petState={petState}
+        visible={showMiniPet}
+        onQuickFeed={() => handleAction('feed')}
+        onToggle={() => { setShowMiniPet(false); try { localStorage.setItem('petdesk_mini_pet_visible', 'false'); } catch {} }}
+      />
+
+      {/* Habitat ambient particles */}
+      {getHabitatParticleType(activeHabitat) && (
+        <Particles type={getHabitatParticleType(activeHabitat)} active={true} density={0.5} />
+      )}
 
       {/* Daily Reward popup */}
       <AnimatePresence>

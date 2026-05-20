@@ -44,12 +44,15 @@ const categories = [
       { id: 'jobs', icon: '💼', label: 'Jobs' },
       { id: 'craft', icon: '🔨', label: 'Craft' },
       { id: 'room', icon: '🏠', label: 'Room' },
+      { id: 'decorate', icon: '🪑', label: 'Decor' },
       { id: 'habitat', icon: '🏡', label: 'Habitat' },
     ],
   },
   {
     label: 'Progress',
     items: [
+      { id: 'evolution', icon: '🧬', label: 'Evolve' },
+      { id: 'skills', icon: '📘', label: 'Skills' },
       { id: 'quests', icon: '📜', label: 'Quests' },
       { id: 'achievements', icon: '🏆', label: 'Achieve' },
       { id: 'diary', icon: '📖', label: 'Diary' },
@@ -61,6 +64,8 @@ const categories = [
     label: 'Tools',
     items: [
       { id: 'pomodoro', icon: '🍅', label: 'Focus' },
+      { id: 'importExport', icon: '📦', label: 'Backup' },
+      { id: 'miniPet', icon: '🐾', label: 'Mini' },
       { id: 'keybinds', icon: '⌨️', label: 'Keys' },
       { id: 'sound', icon: '🔊', label: 'Sound' },
       { id: 'notifications', icon: '🔔', label: 'Inbox' },
