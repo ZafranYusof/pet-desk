@@ -242,6 +242,7 @@ function WeatherEvent({ activeEvent, onCollectReward, onEventEnd }) {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -30 }}
         transition={{ duration: 0.3 }}
+        onMouseEnter={() => { if (window.electronAPI?.setIgnoreMouse) window.electronAPI.setIgnoreMouse(false); }}
       >
         <span className="text-lg">{activeEvent.emoji}</span>
         <span className="text-sm text-gray-200 font-medium">{activeEvent.name}</span>
