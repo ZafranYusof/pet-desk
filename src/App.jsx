@@ -113,7 +113,7 @@ import ImportExport from './components/ImportExport';
 import { getDecorationBonuses } from './services/decorationService';
 import AIChatPanel from './components/AIChatPanel';
 import AISettings from './components/AISettings';
-import { getAISettings, generateIdleChat, generateActivityComment } from './services/aiChatService';
+import { getAISettings, initAISettings, generateIdleChat, generateActivityComment } from './services/aiChatService';
 import { initActivityMonitor, getCurrentActivity, onActivityChange, isActivityMonitorEnabled, isUserIdle } from './services/activityMonitorService';
 import { getPetContext, trackCommonApp } from './services/petContextService';
 import { recordActivity, recordAppDuration, recordIdle, getInsight as getActivityInsight } from './services/activityLearningService';
@@ -824,6 +824,7 @@ function AppContent() {
 
   // Activity Monitor: initialize and listen for activity changes
   useEffect(() => {
+    initAISettings();
     initActivityMonitor();
 
     // Start file awareness scanning

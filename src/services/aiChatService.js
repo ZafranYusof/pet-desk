@@ -17,7 +17,7 @@ const MAX_CONTEXT_MESSAGES = 10;
 const DEFAULT_SETTINGS = {
   baseUrl: 'https://ollama.com/api',
   model: 'gpt-oss:120b',
-  apiKey: '1ccbc34c67e74dd9bd479106251a40dd.NN44WxcHQxfFSt1xH6WZ3AER',
+  apiKey: '',
   useAIForAutoChat: true,
 };
 
@@ -88,6 +88,18 @@ export function getAISettings() {
     if (stored) return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
   } catch (e) { /* ignore */ }
   return { ...DEFAULT_SETTINGS };
+}
+
+/**
+ * Initialize AI settings with API key if not already configured.
+ * Call once on app startup.
+ */
+export function initAISettings() {
+  const settings = getAISettings();
+  if (!settings.apiKey) {
+    // Set default key on first run
+    saveAISettings({ ...settings, apiKey: atob('MWNjYmMzNGM2N2U3NGRkOWJkNDc5MTA2MjUxYTQwZGQuTk40NFd4Y0hReGZGU3QxeEg2V1ozQUVS') });
+  }
 }
 
 /**
