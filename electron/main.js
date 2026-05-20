@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, globalShortcut, powerMonitor, ipcMain, Tray, Notification } = require('electron');
+﻿const { app, BrowserWindow, globalShortcut, powerMonitor, ipcMain, Tray, Notification, clipboard } = require('electron');
 const path = require('path');
 const { createTray } = require('./tray');
 
@@ -15,6 +15,8 @@ let lastIdleState = 'active'; // 'active' or 'idle'
 let lastActiveWindow = '';
 let sessionStartTime = Date.now();
 let activityCheckInterval = null;
+let clipboardCheckInterval = null;
+let lastClipboardText = '';
 
 const isDev = !app.isPackaged;
 
@@ -160,11 +162,15 @@ function startActivityDetection() {
   activityCheckInterval = setInterval(() => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
 
-    // Check active window title
+    // Check active window title using BrowserWindow focus as proxy
     try {
+      const allWindows = BrowserWindow.getAllWindows();
       const focused = BrowserWindow.getFocusedWindow();
-      // We can't get external window titles easily in Electron without native modules
-      // Instead, track idle/active transitions and session duration
+      const title = focused ? focused.getTitle() : '';
+      if (title && title !== lastActiveWindow) {
+        lastActiveWindow = title;
+        mainWindow.webContents.send('active-window-change', { title, name: title });
+      }
     } catch (e) {}
 
     // Check for long session (2 hours)
@@ -174,6 +180,20 @@ function startActivityDetection() {
       sessionStartTime = Date.now(); // Reset so it doesn't spam
     }
   }, 30000); // Check every 30 seconds
+}
+
+function startClipboardMonitoring() {
+  lastClipboardText = clipboard.readText();
+  clipboardCheckInterval = setInterval(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    try {
+      const currentText = clipboard.readText();
+      if (currentText && currentText !== lastClipboardText) {
+        lastClipboardText = currentText;
+        mainWindow.webContents.send('clipboard-change', currentText);
+      }
+    } catch (e) {}
+  }, 2000); // Check every 2 seconds
 }
 
 app.whenReady().then(() => {
@@ -198,6 +218,9 @@ app.whenReady().then(() => {
 
   // Start activity detection
   startActivityDetection();
+
+  // Start clipboard monitoring
+  startClipboardMonitoring();
 });
 
 // Second instance handling
@@ -211,6 +234,8 @@ app.on('second-instance', () => {
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   if (idleCheckInterval) clearInterval(idleCheckInterval);
+  if (activityCheckInterval) clearInterval(activityCheckInterval);
+  if (clipboardCheckInterval) clearInterval(clipboardCheckInterval);
 });
 
 app.on('window-all-closed', () => {

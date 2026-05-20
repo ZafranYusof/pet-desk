@@ -8,6 +8,7 @@ const gameOptions = [
 ];
 
 const menuItems = [
+  { id: 'stats', icon: '📊', label: 'Pet Stats' },
   { id: 'food', icon: '🍽️', label: 'Food', disableCheck: (state) => state?.hunger > 90 },
   { id: 'play', icon: '🎮', label: 'Play', disableCheck: (state) => state?.energy < 10 },
   { id: 'games', icon: '🕹️', label: 'Play Game', disableCheck: (state) => state?.energy < 10 },

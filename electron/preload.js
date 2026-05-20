@@ -38,5 +38,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Desktop notifications
   showNotification: (message) => ipcRenderer.invoke('show-notification', message),
+
+  // Clipboard monitoring
+  onClipboardChange: (callback) => {
+    ipcRenderer.on('clipboard-change', (event, text) => callback(text));
+  },
+
+  // Active window detection
+  onActiveWindowChange: (callback) => {
+    ipcRenderer.on('active-window-change', (event, data) => callback(data));
+  },
 });
 
