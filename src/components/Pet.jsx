@@ -93,6 +93,8 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
   // Walk speed modifier based on time of day
   const walkSpeedModifier = timeOfDay === 'night' ? 0.5 : timeOfDay === 'evening' ? 0.8 : timeOfDay === 'morning' ? 1.3 : 1.0;
   const effectiveWalkSpeed = WALK_SPEED * walkSpeedModifier;
+  const effectiveWalkSpeedRef = useRef(effectiveWalkSpeed);
+  effectiveWalkSpeedRef.current = effectiveWalkSpeed;
 
   // Stormy weather shaking effect
   useEffect(() => {
@@ -124,12 +126,23 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
   }, [timeOfDay, addEmote]);
 
   // Walking logic using requestAnimationFrame
+  const onPositionChangeRef = useRef(onPositionChange);
+  onPositionChangeRef.current = onPositionChange;
+
   useEffect(() => {
-    if (!isWalking || targetRef.current === null) return;
+    if (!isWalking || targetRef.current === null) {
+      // Double check - if isWalking but no target, reset
+      if (isWalking && targetRef.current === null) {
+        setIsWalking(false);
+      }
+      return;
+    }
 
     let lastTime = performance.now();
+    let running = true;
 
     const step = (now) => {
+      if (!running) return;
       const delta = (now - lastTime) / (1000 / 60); // normalize to 60fps
       lastTime = now;
 
@@ -139,33 +152,36 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
 
         const dx = target - prev.x;
         const dist = Math.abs(dx);
+        const speed = effectiveWalkSpeedRef.current;
 
-        if (dist < effectiveWalkSpeed * 2) {
+        if (dist < speed * 2) {
           // Arrived at destination
           targetRef.current = null;
           setIsWalking(false);
+          running = false;
           const newPos = { ...prev, x: target };
-          if (onPositionChange) onPositionChange(newPos);
+          if (onPositionChangeRef.current) onPositionChangeRef.current(newPos);
           return newPos;
         }
 
         const dir = dx > 0 ? 1 : -1;
         setWalkDirection(dir);
-        const newPos = { ...prev, x: prev.x + dir * effectiveWalkSpeed * delta };
-        if (onPositionChange) onPositionChange(newPos);
+        const newPos = { ...prev, x: prev.x + dir * speed * delta };
+        if (onPositionChangeRef.current) onPositionChangeRef.current(newPos);
         return newPos;
       });
 
-      if (targetRef.current !== null) {
+      if (running && targetRef.current !== null) {
         animFrameRef.current = requestAnimationFrame(step);
       }
     };
 
     animFrameRef.current = requestAnimationFrame(step);
     return () => {
+      running = false;
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [isWalking, effectiveWalkSpeed]);
+  }, [isWalking]); // only restart when walking starts/stops
 
   // Schedule walking behavior: idle time modified by personality
   const petStateRef = useRef(petState);
@@ -177,7 +193,7 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
 
   useEffect(() => {
     const scheduleNextWalk = () => {
-      const baseIdle = (Math.random() * 10 + 5) * 1000; // 5-15s
+      const baseIdle = (Math.random() * 5 + 3) * 1000; // 3-8s (more frequent)
       const idleTime = baseIdle / walkFreqRef.current;
       idleTimerRef.current = setTimeout(() => {
         if (petStateRef.current === 'idle' || petStateRef.current === 'happy') {
@@ -189,8 +205,18 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
       }, idleTime);
     };
 
-    scheduleNextWalk();
+    // Start first walk quickly (1-2s after mount)
+    const initialTimer = setTimeout(() => {
+      if (petStateRef.current === 'idle' || petStateRef.current === 'happy') {
+        const dest = pickNewDestRef.current();
+        targetRef.current = dest;
+        setIsWalking(true);
+      }
+      scheduleNextWalk();
+    }, 1000 + Math.random() * 1000);
+
     return () => {
+      clearTimeout(initialTimer);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
   }, []); // stable - uses refs for latest values
