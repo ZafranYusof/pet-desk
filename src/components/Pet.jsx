@@ -35,7 +35,7 @@ const FRAME_INTERVALS = {
 
 const PET_SIZE = 128;
 const EDGE_PADDING = 50;
-const WALK_SPEED = 2; // px per frame at 60fps
+const WALK_SPEED = 3; // px per frame at 60fps (was 2, now faster)
 const GRAVITY_OFFSET = 150; // pet stays near bottom
 
 // Species-specific accessory offsets (where accessories sit on each species)
@@ -64,6 +64,8 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
   const targetRef = useRef(null);
   const idleTimerRef = useRef(null);
   const [isShaking, setIsShaking] = useState(false);
+  const [isTilting, setIsTilting] = useState(false);
+  const [isHiding, setIsHiding] = useState(false);
   const { emoteQueue, addEmote } = useEmotes();
 
   const personality = getPersonality(species);
@@ -86,6 +88,10 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
   const pickNewDestination = useCallback(() => {
     const minX = EDGE_PADDING;
     const maxX = screenWidth - PET_SIZE - EDGE_PADDING;
+    // 15% chance to go to screen edge (peek behavior)
+    if (Math.random() < 0.15) {
+      return Math.random() < 0.5 ? minX - 20 : maxX + 20;
+    }
     const targetX = Math.floor(Math.random() * (maxX - minX)) + minX;
     return targetX;
   }, [screenWidth]);
@@ -124,6 +130,39 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
       return () => clearInterval(timer);
     }
   }, [timeOfDay, addEmote]);
+
+  // Random curious head tilt (every 12-25s)
+  useEffect(() => {
+    const scheduleTilt = () => {
+      const delay = (Math.random() * 13 + 12) * 1000;
+      return setTimeout(() => {
+        if (petStateRef.current === 'idle' && !isWalkingRef.current) {
+          setIsTilting(true);
+          setTimeout(() => setIsTilting(false), 1500);
+        }
+        tiltTimer = scheduleTilt();
+      }, delay);
+    };
+    let tiltTimer = scheduleTilt();
+    return () => clearTimeout(tiltTimer);
+  }, []);
+
+  // Random hide-and-peek (every 30-60s, pet slides partially off-screen)
+  useEffect(() => {
+    const scheduleHide = () => {
+      const delay = (Math.random() * 30 + 30) * 1000;
+      return setTimeout(() => {
+        if (petStateRef.current === 'idle' && !isWalkingRef.current) {
+          setIsHiding(true);
+          // Peek back after 2-4s
+          setTimeout(() => setIsHiding(false), 2000 + Math.random() * 2000);
+        }
+        hideTimer = scheduleHide();
+      }, delay);
+    };
+    let hideTimer = scheduleHide();
+    return () => clearTimeout(hideTimer);
+  }, []);
 
   // Walking logic using requestAnimationFrame
   const onPositionChangeRef = useRef(onPositionChange);
@@ -193,7 +232,7 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
 
   useEffect(() => {
     const scheduleNextWalk = () => {
-      const baseIdle = (Math.random() * 5 + 3) * 1000; // 3-8s (more frequent)
+      const baseIdle = (Math.random() * 3 + 1.5) * 1000; // 1.5-4.5s (much more frequent)
       const idleTime = baseIdle / walkFreqRef.current;
       idleTimerRef.current = setTimeout(() => {
         if (petStateRef.current === 'idle' || petStateRef.current === 'happy') {
@@ -205,7 +244,7 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
       }, idleTime);
     };
 
-    // Start first walk quickly (1-2s after mount)
+    // Start first walk quickly (0.5-1.5s after mount)
     const initialTimer = setTimeout(() => {
       if (petStateRef.current === 'idle' || petStateRef.current === 'happy') {
         const dest = pickNewDestRef.current();
@@ -213,7 +252,7 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
         setIsWalking(true);
       }
       scheduleNextWalk();
-    }, 1000 + Math.random() * 1000);
+    }, 500 + Math.random() * 1000);
 
     return () => {
       clearTimeout(initialTimer);
@@ -242,7 +281,7 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
 
   useEffect(() => {
     const scheduleJump = () => {
-      const baseDelay = (Math.random() * 20 + 20) * 1000;
+      const baseDelay = (Math.random() * 10 + 8) * 1000; // 8-18s (more frequent jumps)
       const delay = baseDelay / bounceFreqRef.current;
       const timer = setTimeout(() => {
         if ((petStateRef.current === 'idle' || petStateRef.current === 'happy') && !isWalkingRef.current) {
@@ -359,6 +398,24 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
     animation: 'shake 0.3s infinite',
   } : {};
 
+  // Curious head tilt
+  const tiltStyle = isTilting ? {
+    transform: 'rotate(15deg)',
+    transition: 'transform 0.3s ease',
+  } : {
+    transform: 'rotate(0deg)',
+    transition: 'transform 0.3s ease',
+  };
+
+  // Hide-and-peek (slide down partially)
+  const hideStyle = isHiding ? {
+    transform: 'translateY(40%)',
+    transition: 'transform 0.5s ease-in-out',
+  } : {
+    transform: 'translateY(0%)',
+    transition: 'transform 0.5s ease-in-out',
+  };
+
   // Bounce animation variants
   const bounceVariants = {
     idle: {
@@ -405,13 +462,14 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
         opacity: ghostOpacity,
         transform: isCompanion ? 'scale(0.8)' : undefined,
         transformOrigin: 'bottom center',
+        ...hideStyle,
       }}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <div style={{ position: 'relative', display: 'inline-block' }}>
+      <div style={{ position: 'relative', display: 'inline-block', ...tiltStyle }}>
         {/* Companion name tag */}
         {isCompanion && companionName && (
           <div
