@@ -263,7 +263,7 @@ function AppContent() {
   // Activity monitoring state
   const [currentActivityState, setCurrentActivityState] = useState(null);
   const lastActivityCommentRef = useRef(0);
-  const ACTIVITY_COMMENT_COOLDOWN = 3 * 60 * 1000; // 3 minutes between activity comments
+  const ACTIVITY_COMMENT_COOLDOWN = 45 * 1000; // 45 seconds between activity comments
 
   // Multi-pet state
   const [petSlots, setPetSlots] = useState(() => getPetSlots());
@@ -768,6 +768,25 @@ function AppContent() {
       // Clipboard intelligence reactions are handled separately below
     });
 
+    // Screenshot detection
+    if (window.electronAPI?.onScreenshot) {
+      window.electronAPI.onScreenshot((data) => {
+        const reactions = [
+          '📸 Nice screenshot!',
+          '📸 Capturing memories?',
+          '📸 Ooh what are you saving?',
+          '📸 *poses for the camera*',
+          '📸 Screenshot taken! Need to share something?',
+          '📸 Say cheese! 🧀',
+          '📸 I saw that! Saving evidence? 👀',
+        ];
+        const msg = reactions[Math.floor(Math.random() * reactions.length)];
+        setChatBubble(msg);
+        saveChatMessage(msg);
+        autoSpeak(msg);
+      });
+    }
+
     const unsubscribe = onActivityChange(async (activity) => {
       if (!isActivityMonitorEnabled()) return;
       setCurrentActivityState(activity);
@@ -784,8 +803,8 @@ function AppContent() {
       const now = Date.now();
       if (now - lastActivityCommentRef.current < ACTIVITY_COMMENT_COOLDOWN) return;
 
-      // 30% chance pet comments on activity change
-      if (Math.random() > 0.3) return;
+      // 70% chance pet comments on activity change
+      if (Math.random() > 0.7) return;
 
       lastActivityCommentRef.current = now;
 

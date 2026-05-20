@@ -423,6 +423,20 @@ app.whenReady().then(() => {
 
   // Start clipboard monitoring
   startClipboardMonitoring();
+
+  // Screenshot detection: PrintScreen key
+  globalShortcut.register('PrintScreen', () => {
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('screenshot-taken', { method: 'printscreen', time: Date.now() });
+    }
+  });
+
+  // Screenshot detection: Win+Shift+S (Snipping Tool)
+  globalShortcut.register('Super+Shift+S', () => {
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('screenshot-taken', { method: 'snipping', time: Date.now() });
+    }
+  });
 });
 
 // Second instance handling

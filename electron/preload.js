@@ -44,6 +44,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('clipboard-change', (event, text) => callback(text));
   },
 
+  // Screenshot detection
+  onScreenshot: (callback) => {
+    ipcRenderer.on('screenshot-taken', (event, data) => callback(data));
+  },
+
   // Active window detection (PowerShell-based, real foreground window)
   onActiveWindow: (callback) => {
     ipcRenderer.on('active-window', (event, data) => callback(data));
