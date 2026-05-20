@@ -932,11 +932,32 @@ function AppContent() {
   const anyPanelOpen = showStats || showPetSelector || showAccessoryShop || showDiary || showAchievements || showScrapbook || showDailyReward || showWidget || showSpriteEditor || showFoodMenu || showBirthday || showSoundSettings || showStatsDashboard || showBattle || showDungeon || showPhotoMode || showHabitatSelector || showStory || showGarden || showJobBoard || showArcade || showPetRoom || showCrafting || showBreedingLab || showChatLog || showLeaderboard || showActivityLog || showKeybindSettings || showColorPalette || showSeasonalEvent || showDreamSequence || showDreamLog || showPomodoro || showQuestBoard || showNotificationCenter || showOnboarding || showPetSlots || showEvolutionTree || showHomeDecorator || showSkillTree || showImportExport || contextMenu !== null || activeGame !== null;
 
   // Use layoutEffect for synchronous mouse toggle (no frame delay)
+  // This is the SINGLE source of truth for ignore mouse state
+  const anyPanelOpenRef = useRef(anyPanelOpen);
+  anyPanelOpenRef.current = anyPanelOpen;
+
   React.useLayoutEffect(() => {
     if (window.electronAPI?.setIgnoreMouse) {
-      window.electronAPI.setIgnoreMouse(!anyPanelOpen);
+      if (anyPanelOpen) {
+        window.electronAPI.setIgnoreMouse(false);
+      } else {
+        window.electronAPI.setIgnoreMouse(true);
+      }
     }
   }, [anyPanelOpen]);
+
+  // Re-enable ignore when mouse leaves pet (only if no panel open)
+  useEffect(() => {
+    const handler = () => {
+      setTimeout(() => {
+        if (!anyPanelOpenRef.current && window.electronAPI?.setIgnoreMouse) {
+          window.electronAPI.setIgnoreMouse(true);
+        }
+      }, 150);
+    };
+    window.addEventListener('pet-mouse-leave', handler);
+    return () => window.removeEventListener('pet-mouse-leave', handler);
+  }, []);
 
   // Get palette filter for pet sprite
   const paletteFilter = getPaletteFilter(colorPalette.id, colorPalette.customHue);

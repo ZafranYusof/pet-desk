@@ -342,11 +342,10 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessor
     }
   }, []);
 
+  // onMouseLeave dispatches custom event so App.jsx can decide whether to re-enable ignore
   const handleMouseLeave = useCallback(() => {
     setIsHovered(false);
-    if (window.electronAPI) {
-      window.electronAPI.setIgnoreMouse(true);
-    }
+    window.dispatchEvent(new CustomEvent('pet-mouse-leave'));
   }, []);
 
   const spriteKey = frames[frameIndex % frames.length];

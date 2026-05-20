@@ -86,6 +86,14 @@ function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
   const [showGames, setShowGames] = useState(false);
   const [tooltip, setTooltip] = useState(null);
 
+  // Disable click-through when mouse is over context menu
+  const handleMouseEnter = () => {
+    if (window.electronAPI?.setIgnoreMouse) window.electronAPI.setIgnoreMouse(false);
+  };
+  const handleMouseLeave = () => {
+    if (window.electronAPI?.setIgnoreMouse) window.electronAPI.setIgnoreMouse(true);
+  };
+
   useEffect(() => {
     function handleClickOutside(e) {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
@@ -121,6 +129,8 @@ function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.8 }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
       >
         <div className="p-2">
@@ -164,6 +174,8 @@ function ContextMenu({ x = 0, y = 0, petState, onAction, onClose }) {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.75 }}
       transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <div className="p-2 max-h-[420px] overflow-y-auto custom-scrollbar">
         {categories.map((cat, catIdx) => (

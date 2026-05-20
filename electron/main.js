@@ -44,7 +44,8 @@ function createWindow() {
     },
   });
 
-  // Full screen click-through: ignore mouse events everywhere except pet sprite
+  // Full screen click-through: ignore mouse events everywhere except interactive elements
+  // Renderer toggles this off when mouse enters pet/panels
   mainWindow.setIgnoreMouseEvents(true, { forward: true });
 
   // Load content
