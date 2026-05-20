@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS = {
   baseUrl: 'https://ollama.com/api',
   model: 'gpt-oss:120b',
   apiKey: '',
-  useAIForAutoChat: false,
+  useAIForAutoChat: true,
 };
 
 const FALLBACK_RESPONSES = [
@@ -420,10 +420,12 @@ export async function generateActivityComment(activity, petContext) {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('[PetDesk AI] Activity comment generated successfully');
         const reply = data.choices?.[0]?.message?.content?.trim();
         if (reply) return reply;
       }
     } catch (e) {
+      console.log('[PetDesk AI] Activity comment failed:', e.message);
       // Fall through to hardcoded
     }
   }
