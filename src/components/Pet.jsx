@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
 import PetSprite from './PetSprite';
+import Accessory from './Accessory';
 import Emotes, { useEmotes } from './Emotes';
 import sprites from '../data/sprites';
 import evolvedSprites from '../data/evolvedSprites';
+import { accessories } from '../data/accessories';
 import { getPersonality } from '../services/personality';
 import { getEvolutionStage } from '../services/evolutionService';
 
@@ -36,7 +38,14 @@ const EDGE_PADDING = 50;
 const WALK_SPEED = 2; // px per frame at 60fps
 const GRAVITY_OFFSET = 150; // pet stays near bottom
 
-const Pet = ({ petState = 'idle', species = 'slime', level = 1, onPet, onBounce, screenWidth = 1920, screenHeight = 1080, timeOfDay = 'afternoon', weather = 'sunny', triggerEmote = null, isCompanion = false, companionName = '', onPositionChange = null }) => {
+// Species-specific accessory offsets (where accessories sit on each species)
+const SPECIES_OFFSETS = {
+  slime: { hat: { x: 0, y: -3 }, glasses: { x: 0, y: 0 }, other: { x: 0, y: 1 } },
+  cat: { hat: { x: 0, y: -4 }, glasses: { x: 0, y: -1 }, other: { x: 0, y: 1 } },
+  ghost: { hat: { x: 0, y: -3 }, glasses: { x: 0, y: 0 }, other: { x: 0, y: 2 } },
+};
+
+const Pet = ({ petState = 'idle', species = 'slime', level = 1, equippedAccessories = [], onPet, onBounce, screenWidth = 1920, screenHeight = 1080, timeOfDay = 'afternoon', weather = 'sunny', triggerEmote = null, isCompanion = false, companionName = '', onPositionChange = null }) => {
   const [frameIndex, setFrameIndex] = useState(0);
   const [position, setPosition] = useState(() => ({
     x: isCompanion
@@ -392,6 +401,19 @@ const Pet = ({ petState = 'idle', species = 'slime', level = 1, onPet, onBounce,
           }}
         >
           <PetSprite sprite={currentSprite} scale={1} />
+          {/* Render equipped accessories */}
+          {equippedAccessories.map((accId) => {
+            const acc = accessories.find((a) => a.id === accId);
+            if (!acc) return null;
+            return (
+              <Accessory
+                key={accId}
+                accessory={acc}
+                speciesOffsets={SPECIES_OFFSETS[species] || SPECIES_OFFSETS.slime}
+                cellSize={4}
+              />
+            );
+          })}
         </motion.div>
         <div className="pet-shadow" />
       </div>

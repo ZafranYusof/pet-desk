@@ -895,6 +895,7 @@ function AppContent() {
           petState={petState.state || 'idle'}
           species={petState.species || 'slime'}
           level={petState.level || 1}
+          equippedAccessories={petState.accessories || []}
           onPet={handlePetClick}
           onBounce={noopBounce}
           screenWidth={screenSize.width}
@@ -919,6 +920,7 @@ function AppContent() {
           petState={companionState.state || 'idle'}
           species={companionState.species || 'slime'}
           level={companionState.level || 1}
+          equippedAccessories={companionState.accessories || []}
           onPet={() => {}}
           onBounce={noopBounce}
           screenWidth={screenSize.width}
